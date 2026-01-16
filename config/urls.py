@@ -4,13 +4,12 @@ from django.urls import path, include
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-    # 🔐 dj-rest-auth
+    # 🔐 Auth
     path("api/auth/", include("dj_rest_auth.urls")),
     path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
 
-    # 🔑 SOCIAL LOGIN (THIS CREATES /api/auth/google/)
-    path("api/auth/", include("dj_rest_auth.social_urls")),
-
-    # allauth
+    # 🌐 Allauth (Google OAuth)
     path("accounts/", include("allauth.urls")),
+    path("api/auth/", include("accounts.urls")),
+
 ]
