@@ -85,11 +85,8 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
-LOGIN_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/oauth-success"
+LOGIN_REDIRECT_URL = "/accounts/google/success/"
 LOGOUT_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/login"
-
-
-
 
 
 # --------------------------------------------------
@@ -143,7 +140,7 @@ SOCIALACCOUNT_PROVIDERS = {
 # --------------------------------------------------
 # CORS
 # --------------------------------------------------
-CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "https://whatsapp-integration-frontend-green.vercel.app",
 ]

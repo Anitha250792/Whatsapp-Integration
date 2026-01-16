@@ -9,6 +9,7 @@ urlpatterns = [
     path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
 
     # 🌐 Allauth (Google OAuth)
+    path("accounts/", include("accounts.urls")),
     path("accounts/", include("allauth.urls")),
     path("api/auth/", include("accounts.urls")),
 

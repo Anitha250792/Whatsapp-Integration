@@ -1,8 +1,13 @@
-from dj_rest_auth.registration.views import SocialLoginView
-from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
-from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+from django.shortcuts import redirect
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth.decorators import login_required
 
-class GoogleLogin(SocialLoginView):
-    adapter_class = GoogleOAuth2Adapter
-    client_class = OAuth2Client
-    callback_url = "https://whatsapp-integration-frontend-green.vercel.app/oauth-success"
+@login_required
+def google_login_success(request):
+    user = request.user
+    refresh = RefreshToken.for_user(user)
+
+    return redirect(
+        f"https://whatsapp-integration-frontend-green.vercel.app/oauth-success"
+        f"?access={refresh.access_token}&refresh={refresh}"
+    )
