@@ -1,20 +1,12 @@
 from docx import Document
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-import os
+from pdfminer.high_level import extract_text
 
-def word_to_pdf(word_path, pdf_path):
-    doc = Document(word_path)
-    c = canvas.Canvas(pdf_path, pagesize=A4)
+def pdf_to_word(pdf_path, output_path):
+    text = extract_text(pdf_path)
 
-    width, height = A4
-    y = height - 40
+    doc = Document()
+    for line in text.split("\n"):
+        doc.add_paragraph(line)
 
-    for para in doc.paragraphs:
-        c.drawString(40, y, para.text)
-        y -= 20
-        if y < 40:
-            c.showPage()
-            y = height - 40
-
-    c.save()
+    doc.save(output_path)
+    return output_path
