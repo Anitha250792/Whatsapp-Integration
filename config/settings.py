@@ -144,12 +144,12 @@ SOCIALACCOUNT_PROVIDERS = {
 # --------------------------------------------------
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
+    "https://whatsapp-integration-frontend-green.vercel.app",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost:5173"]
+CSRF_TRUSTED_ORIGINS = ["https://whatsapp-integration-frontend-green.vercel.app"]
 SESSION_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SECURE = True
 
