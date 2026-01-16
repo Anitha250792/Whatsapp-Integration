@@ -86,8 +86,8 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
-LOGIN_REDIRECT_URL = "http://localhost:5173/dashboard"
-LOGOUT_REDIRECT_URL = "http://localhost:5173/login"
+LOGIN_REDIRECT_URL = "/accounts/google/success/"
+LOGOUT_REDIRECT_URL = "/"
 
 
 
