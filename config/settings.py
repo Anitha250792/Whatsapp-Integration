@@ -85,8 +85,9 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
-LOGIN_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/dashboard"
+LOGIN_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/oauth-success"
 LOGOUT_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/login"
+
 
 
 
