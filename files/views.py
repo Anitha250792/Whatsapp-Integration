@@ -30,15 +30,19 @@ class UploadFileView(APIView):
     parser_classes = [MultiPartParser]
 
     def post(self, request):
-        uploaded = []
-        for f in request.FILES.getlist("file"):
+        files = request.FILES.getlist("file")
+        saved = []
+
+        for f in files:
             obj = File.objects.create(
                 user=request.user,
                 file=f,
                 filename=f.name
             )
-            uploaded.append(FileSerializer(obj).data)
-        return Response(uploaded, status=201)
+            saved.append(FileSerializer(obj).data)
+
+        return Response(saved, status=201)
+
 
 
 class DeleteFileView(APIView):
