@@ -74,12 +74,28 @@ class PDFToWordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        obj = get_object_or_404(File, id=file_id, user=request.user)
+        file_obj = get_object_or_404(File, id=file_id, user=request.user)
 
-        tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
-        pdf_to_word(obj.file.path, tmp.name)
+        try:
+            tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+            pdf_to_word(file_obj.file.path, tmp.name)
 
-        return FileResponse(open(tmp.name, "rb"), as_attachment=True)
+            return FileResponse(
+                open(tmp.name, "rb"),
+                as_attachment=True,
+                filename="converted.docx"
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "error": "PDF to Word conversion failed",
+                    "reason": str(e),
+                    "hint": "Scanned PDFs require OCR"
+                },
+                status=400
+            )
+
 
 
 class MergePDFView(APIView):
