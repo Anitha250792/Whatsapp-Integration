@@ -1,17 +1,26 @@
+import os
+import tempfile
+import zipfile
+
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
+from django.conf import settings
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser
-from django.shortcuts import get_object_or_404
-from django.conf import settings
-import os
 
 from .models import File
 from .serializers import FileSerializer
 from .converters import (
-    word_to_pdf, pdf_to_word,
-    sign_pdf, merge_pdfs, split_pdf
+    word_to_pdf,
+    pdf_to_word,
+    merge_pdfs,
+    split_pdf,
+    sign_pdf,
 )
+
 
 
 # 📂 List uploaded files
@@ -20,23 +29,18 @@ class FileListView(APIView):
 
     def get(self, request):
         files = File.objects.filter(user=request.user).order_by("-id")
-        serializer = FileSerializer(files, many=True)
-        return Response(serializer.data)
-    
+        return Response(FileSerializer(files, many=True).data)
+
 
 class DeleteFileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, file_id):
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
-
-        # delete file from storage
         file_obj.file.delete(save=False)
-
-        # delete db record
         file_obj.delete()
+        return Response({"message": "File deleted"})
 
-        return Response({"message": "File deleted successfully"})
 
 
 # ⬆ Upload file
@@ -59,14 +63,18 @@ class UploadFileView(APIView):
         return Response(saved, status=201)
 
 
+
 # 📊 Dashboard health check (optional)
 class DownloadFileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, file_id):
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
-        return Response({"url": file_obj.file.url})
-
+        return FileResponse(
+            open(file_obj.file.path, "rb"),
+            as_attachment=True,
+            filename=file_obj.filename
+        )
 
 # 🔁 Word ➜ PDF
 class WordToPDFView(APIView):
@@ -74,10 +82,16 @@ class WordToPDFView(APIView):
 
     def post(self, request, file_id):
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
-        out = os.path.join(settings.MEDIA_ROOT, f"{file_id}.pdf")
-        word_to_pdf(file_obj.file.path, out)
-        return Response({"pdf_url": settings.MEDIA_URL + f"{file_id}.pdf"})
 
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            word_to_pdf(file_obj.file.path, tmp.name)
+            tmp.seek(0)
+
+            return FileResponse(
+                open(tmp.name, "rb"),
+                as_attachment=True,
+                filename="converted.pdf"
+            )
 
 # 🔁 PDF ➜ Word
 class PDFToWordView(APIView):
@@ -85,9 +99,17 @@ class PDFToWordView(APIView):
 
     def post(self, request, file_id):
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
-        out = os.path.join(settings.MEDIA_ROOT, f"{file_id}.docx")
-        pdf_to_word(file_obj.file.path, out)
-        return Response({"docx_url": settings.MEDIA_URL + f"{file_id}.docx"})
+
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+            pdf_to_word(file_obj.file.path, tmp.name)
+            tmp.seek(0)
+
+            return FileResponse(
+                open(tmp.name, "rb"),
+                as_attachment=True,
+                filename="converted.docx"
+            )
+
 
 class MergePDFView(APIView):
     permission_classes = [IsAuthenticated]
@@ -97,10 +119,16 @@ class MergePDFView(APIView):
         files = File.objects.filter(id__in=ids, user=request.user)
 
         paths = [f.file.path for f in files]
-        out = os.path.join(settings.MEDIA_ROOT, "merged.pdf")
-        merge_pdfs(paths, out)
 
-        return Response({"merged_pdf": settings.MEDIA_URL + "merged.pdf"})
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            merge_pdfs(paths, tmp.name)
+            tmp.seek(0)
+
+            return FileResponse(
+                open(tmp.name, "rb"),
+                as_attachment=True,
+                filename="merged.pdf"
+            )
 
 
 class SplitPDFView(APIView):
@@ -108,11 +136,21 @@ class SplitPDFView(APIView):
 
     def post(self, request, file_id):
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
-        output_dir = settings.MEDIA_ROOT
-        split_pdf(file_obj.file.path, output_dir)
 
-        return Response({"message": "PDF split successfully"})
+        with tempfile.TemporaryDirectory() as tmpdir:
+            split_pdf(file_obj.file.path, tmpdir)
 
+            zip_path = os.path.join(tmpdir, "split_pages.zip")
+            with zipfile.ZipFile(zip_path, "w") as zipf:
+                for f in os.listdir(tmpdir):
+                    if f.endswith(".pdf"):
+                        zipf.write(os.path.join(tmpdir, f), f)
+
+            return FileResponse(
+                open(zip_path, "rb"),
+                as_attachment=True,
+                filename="split_pages.zip"
+            )
 
 class SignPDFView(APIView):
     permission_classes = [IsAuthenticated]
@@ -121,7 +159,12 @@ class SignPDFView(APIView):
         signer = request.data.get("signer", "Signed User")
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
 
-        out = os.path.join(settings.MEDIA_ROOT, f"{file_id}_signed.pdf")
-        sign_pdf(file_obj.file.path, out, signer)
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            sign_pdf(file_obj.file.path, tmp.name, signer)
+            tmp.seek(0)
 
-        return Response({"signed_pdf": settings.MEDIA_URL + f"{file_id}_signed.pdf"})
+            return FileResponse(
+                open(tmp.name, "rb"),
+                as_attachment=True,
+                filename="signed.pdf"
+            )
