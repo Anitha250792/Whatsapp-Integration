@@ -30,6 +30,12 @@ class UploadFileView(APIView):
     parser_classes = [MultiPartParser]
 
     def post(self, request):
+        if "file" not in request.FILES:
+            return Response(
+                {"error": "No file received"},
+                status=400
+            )
+
         files = request.FILES.getlist("file")
         saved = []
 
@@ -42,6 +48,7 @@ class UploadFileView(APIView):
             saved.append(FileSerializer(obj).data)
 
         return Response(saved, status=201)
+
 
 
 
