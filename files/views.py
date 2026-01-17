@@ -1,3 +1,4 @@
+# files/views.py
 import os
 import tempfile
 import zipfile
@@ -21,7 +22,6 @@ from .converters import (
 )
 
 
-# 📂 List uploaded files
 class FileListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -30,40 +30,20 @@ class FileListView(APIView):
         return Response(FileSerializer(files, many=True).data)
 
 
-# ⬆ Upload file
 class UploadFileView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser]
 
     def post(self, request):
-        files = request.FILES.getlist("file")
-        saved = []
-
-        for f in files:
-            obj = File.objects.create(
-                user=request.user,
-                file=f,
-                filename=f.name,
-            )
-            saved.append(FileSerializer(obj).data)
-
-        return Response(saved, status=201)
-
-
-# ⬇ Download file (THIS MUST EXIST)
-class DownloadFileView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, file_id):
-        file_obj = get_object_or_404(File, id=file_id, user=request.user)
-        return FileResponse(
-            open(file_obj.file.path, "rb"),
-            as_attachment=True,
-            filename=file_obj.filename,
+        uploaded = request.FILES.get("file")
+        obj = File.objects.create(
+            user=request.user,
+            file=uploaded,
+            filename=uploaded.name
         )
+        return Response(FileSerializer(obj).data, status=201)
 
 
-# ❌ Delete file
 class DeleteFileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -71,64 +51,62 @@ class DeleteFileView(APIView):
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
         file_obj.file.delete(save=False)
         file_obj.delete()
-        return Response({"message": "File deleted"})
+        return Response({"message": "Deleted"})
 
 
-# 🔁 Word ➜ PDF
 class WordToPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, file_id):
+    def get(self, request, file_id):
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
 
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-            word_to_pdf(file_obj.file.path, tmp.name)
-            return FileResponse(
-                open(tmp.name, "rb"),
-                as_attachment=True,
-                filename="converted.pdf",
-            )
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        word_to_pdf(file_obj.file.path, tmp.name)
+
+        return FileResponse(
+            open(tmp.name, "rb"),
+            as_attachment=True,
+            filename="converted.pdf"
+        )
 
 
-# 🔁 PDF ➜ Word
 class PDFToWordView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, file_id):
+    def get(self, request, file_id):
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
 
-        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
-            pdf_to_word(file_obj.file.path, tmp.name)
-            return FileResponse(
-                open(tmp.name, "rb"),
-                as_attachment=True,
-                filename="converted.docx",
-            )
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
+        pdf_to_word(file_obj.file.path, tmp.name)
+
+        return FileResponse(
+            open(tmp.name, "rb"),
+            as_attachment=True,
+            filename="converted.docx"
+        )
 
 
-# 📎 Merge PDFs
 class MergePDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         ids = request.data.get("file_ids", [])
         files = File.objects.filter(id__in=ids, user=request.user)
-        paths = [f.file.path for f in files]
 
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-            merge_pdfs(paths, tmp.name)
-            return FileResponse(
-                open(tmp.name, "rb"),
-                as_attachment=True,
-                filename="merged.pdf",
-            )
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        merge_pdfs([f.file.path for f in files], tmp.name)
+
+        return FileResponse(
+            open(tmp.name, "rb"),
+            as_attachment=True,
+            filename="merged.pdf"
+        )
 
 
-# ✂ Split PDF
 class SplitPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, file_id):
+    def get(self, request, file_id):
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -137,28 +115,27 @@ class SplitPDFView(APIView):
             zip_path = os.path.join(tmpdir, "split_pages.zip")
             with zipfile.ZipFile(zip_path, "w") as zipf:
                 for f in os.listdir(tmpdir):
-                    if f.endswith(".pdf"):
-                        zipf.write(os.path.join(tmpdir, f), f)
+                    zipf.write(os.path.join(tmpdir, f), f)
 
             return FileResponse(
                 open(zip_path, "rb"),
                 as_attachment=True,
-                filename="split_pages.zip",
+                filename="split_pages.zip"
             )
 
 
-# ✍ Sign PDF
 class SignPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, file_id):
-        signer = request.data.get("signer", "Signed User")
+    def get(self, request, file_id):
+        signer = request.GET.get("signer", "Signed User")
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
 
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-            sign_pdf(file_obj.file.path, tmp.name, signer)
-            return FileResponse(
-                open(tmp.name, "rb"),
-                as_attachment=True,
-                filename="signed.pdf",
-            )
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        sign_pdf(file_obj.file.path, tmp.name, signer)
+
+        return FileResponse(
+            open(tmp.name, "rb"),
+            as_attachment=True,
+            filename="signed.pdf"
+        )
