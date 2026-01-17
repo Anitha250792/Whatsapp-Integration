@@ -1,6 +1,6 @@
 from django.urls import path
-from .views import google_login_success
+from .views import GoogleLoginAPIView
 
 urlpatterns = [
-    path("google/success/", google_login_success),
+    path("google/", GoogleLoginAPIView.as_view()),
 ]
