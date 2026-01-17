@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import UploadedFile
 from django.conf import settings
-from .converters import word_to_pdf
-from .converters import pdf_to_word
+from .converters import pdf_to_word, word_to_pdf
+
 import os
 
 class FileUploadView(APIView):
