@@ -3,9 +3,12 @@ from pdfminer.high_level import extract_text
 from reportlab.pdfgen import canvas
 from pdf2image import convert_from_path
 from PyPDF2 import PdfMerger, PdfReader, PdfWriter
+import pytesseract
 import os
+from django.conf import settings
 
-# PDF ➜ Word
+
+# WORD ➜ PDF
 def word_to_pdf(docx_path, output_path):
     doc = Document(docx_path)
     c = canvas.Canvas(output_path)
@@ -21,13 +24,18 @@ def word_to_pdf(docx_path, output_path):
     c.save()
     return output_path
 
-# Word ➜ PDF
+
+# PDF ➜ WORD (with OCR fallback)
 def pdf_to_word(pdf_path, output_path):
     text = extract_text(pdf_path)
 
-    # If text is empty → scanned PDF → OCR
-    if not text.strip():
-        images = convert_from_path(pdf_path)
+    # If text empty → scanned PDF → OCR
+    if not text or not text.strip():
+        images = convert_from_path(
+            pdf_path,
+            poppler_path=settings.POPPLER_PATH
+        )
+
         text = ""
         for img in images:
             text += pytesseract.image_to_string(img)
@@ -40,8 +48,10 @@ def pdf_to_word(pdf_path, output_path):
         doc.add_paragraph(line)
 
     doc.save(output_path)
+    return output_path
 
-def sign_pdf(pdf_path, output_path, signer="Signed by User"):
+
+def sign_pdf(pdf_path, output_path, signer="Signed"):
     reader = PdfReader(pdf_path)
     writer = PdfWriter()
 
@@ -53,6 +63,7 @@ def sign_pdf(pdf_path, output_path, signer="Signed by User"):
 
     return output_path
 
+
 def merge_pdfs(pdf_paths, output_path):
     merger = PdfMerger()
     for pdf in pdf_paths:
@@ -60,6 +71,7 @@ def merge_pdfs(pdf_paths, output_path):
     merger.write(output_path)
     merger.close()
     return output_path
+
 
 def split_pdf(pdf_path, output_dir):
     reader = PdfReader(pdf_path)

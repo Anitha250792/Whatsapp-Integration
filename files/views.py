@@ -26,27 +26,21 @@ class FileListView(APIView):
 
 class UploadFileView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser]
 
     def post(self, request):
-        uploaded_file = request.FILES.get("file")
+        file = request.FILES.get("file")
+        if not file:
+            return Response({"error": "No file provided"}, status=400)
 
-        if not uploaded_file:
-            return Response(
-                {"error": "No file provided"},
-                status=400
-            )
-
-        obj = File.objects.create(
+        uploaded = UploadedFile.objects.create(
             user=request.user,
-            file=uploaded_file,
-            filename=uploaded_file.name
+            file=file,
+            filename=file.name
         )
-
-        return Response(FileSerializer(obj).data, status=201)
-
-
-
+        return Response({
+            "id": uploaded.id,
+            "filename": uploaded.filename
+        })
 
 class DeleteFileView(APIView):
     permission_classes = [IsAuthenticated]
