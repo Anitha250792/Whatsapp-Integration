@@ -147,7 +147,8 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
-CSRF_TRUSTED_ORIGINS = ["https://whatsapp-integration-frontend-green.vercel.app"]
+CSRF_TRUSTED_ORIGINS = ["https://whatsapp-integration-frontend-green.vercel.app", 
+                        "https://whatsapp-integration-u7tq.onrender.com",]
 SESSION_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SECURE = True
 
@@ -213,9 +214,19 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+MEDIA_ROOT = "/tmp/media"
+
+os.makedirs(MEDIA_ROOT, exist_ok=True)
+
+# ===============================
+# File upload limits (Render safe)
+# ===============================
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024      # 50 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024      # 50 MB
 
 # --------------------------------------------------
 # DEFAULT FIELD
 # --------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
