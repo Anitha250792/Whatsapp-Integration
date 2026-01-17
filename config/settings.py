@@ -126,10 +126,17 @@ REST_FRAMEWORK = {
 
 # --------------------------------------------------
 # GOOGLE OAUTH
-# --------------------------------------------------
-SOCIALACCOUNT_PROVIDERS["google"]["CLIENT_ID"] = "437563404520-eoq5p4n40kl46kiijqgpneeol0snacjk.apps.googleusercontent.com"
-
-
+# -------------------------------------------------
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "SCOPE": ["profile", "email"],
+        "AUTH_PARAMS": {"access_type": "online"},
+        "CLIENT_ID": os.getenv(
+            "GOOGLE_CLIENT_ID",
+            "437563404520-eoq5p4n40kl46kiijqgpneeol0snacjk.apps.googleusercontent.com"
+        ),
+    }
+}
 # --------------------------------------------------
 # CORS
 # --------------------------------------------------
