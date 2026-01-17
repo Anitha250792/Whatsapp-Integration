@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
+from rest_framework import status
 import tempfile, os, zipfile
 
 from .models import File
@@ -77,25 +78,18 @@ class PDFToWordView(APIView):
         file_obj = get_object_or_404(File, id=file_id, user=request.user)
 
         try:
-            tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
-            pdf_to_word(file_obj.file.path, tmp.name)
-
-            return FileResponse(
-                open(tmp.name, "rb"),
-                as_attachment=True,
-                filename="converted.docx"
-            )
-
-        except Exception as e:
+            with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+                pdf_to_word(file_obj.file.path, tmp.name)
+                return FileResponse(
+                    open(tmp.name, "rb"),
+                    as_attachment=True,
+                    filename="converted.docx"
+                )
+        except ValueError:
             return Response(
-                {
-                    "error": "PDF to Word conversion failed",
-                    "reason": str(e),
-                    "hint": "Scanned PDFs require OCR"
-                },
-                status=400
+                {"error": "Scanned PDFs need OCR"},
+                status=status.HTTP_400_BAD_REQUEST
             )
-
 
 
 class MergePDFView(APIView):

@@ -1,6 +1,7 @@
 from docx import Document
 from pdfminer.high_level import extract_text
 from reportlab.pdfgen import canvas
+from pdf2image import convert_from_path
 from PyPDF2 import PdfMerger, PdfReader, PdfWriter
 import os
 
@@ -23,11 +24,22 @@ def word_to_pdf(docx_path, output_path):
 # Word ➜ PDF
 def pdf_to_word(pdf_path, output_path):
     text = extract_text(pdf_path)
+
+    # If text is empty → scanned PDF → OCR
+    if not text.strip():
+        images = convert_from_path(pdf_path)
+        text = ""
+        for img in images:
+            text += pytesseract.image_to_string(img)
+
+        if not text.strip():
+            raise ValueError("Scanned PDFs need OCR")
+
     doc = Document()
     for line in text.split("\n"):
         doc.add_paragraph(line)
+
     doc.save(output_path)
-    return output_path
 
 def sign_pdf(pdf_path, output_path, signer="Signed by User"):
     reader = PdfReader(pdf_path)
