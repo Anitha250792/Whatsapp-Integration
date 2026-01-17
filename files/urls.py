@@ -1,16 +1,11 @@
 from django.urls import path
-from .views import (
-    FileListView,
-    UploadFileView,
-    DashboardView,
-    WordToPDFView,
-    PDFToWordView,
-)
+from .views import *
 
 urlpatterns = [
-    path("", FileListView.as_view()),
     path("upload/", UploadFileView.as_view()),
-    path("dashboard/", DashboardView.as_view(), name="dashboard"),
+    path("download/<int:file_id>/", DownloadFileView.as_view()),
+    path("delete/<int:file_id>/", DeleteFileView.as_view()),
+
     path("convert/word-to-pdf/<int:file_id>/", WordToPDFView.as_view()),
     path("convert/pdf-to-word/<int:file_id>/", PDFToWordView.as_view()),
 ]
