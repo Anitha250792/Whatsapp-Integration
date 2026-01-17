@@ -2,14 +2,15 @@ from django.urls import path
 from .views import (
     FileListView,
     UploadFileView,
-    DownloadFileView,
     DeleteFileView,
+    DownloadFileView,
     WordToPDFView,
     PDFToWordView,
     MergePDFView,
     SplitPDFView,
     SignPDFView,
 )
+
 urlpatterns = [
     path("", FileListView.as_view()),
     path("upload/", UploadFileView.as_view()),
