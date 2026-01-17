@@ -24,30 +24,26 @@ class FileListView(APIView):
         files = File.objects.filter(user=request.user)
         return Response(FileSerializer(files, many=True).data)
 
-
 class UploadFileView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser]
 
     def post(self, request):
-        if "file" not in request.FILES:
+        uploaded_file = request.FILES.get("file")
+
+        if not uploaded_file:
             return Response(
-                {"error": "No file received"},
+                {"error": "No file provided"},
                 status=400
             )
 
-        files = request.FILES.getlist("file")
-        saved = []
+        obj = File.objects.create(
+            user=request.user,
+            file=uploaded_file,
+            filename=uploaded_file.name
+        )
 
-        for f in files:
-            obj = File.objects.create(
-                user=request.user,
-                file=f,
-                filename=f.name
-            )
-            saved.append(FileSerializer(obj).data)
-
-        return Response(saved, status=201)
+        return Response(FileSerializer(obj).data, status=201)
 
 
 

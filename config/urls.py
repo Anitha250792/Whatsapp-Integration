@@ -6,16 +6,17 @@ from django.conf.urls.static import static
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-    # 🔐 Auth
+    # 🔐 dj-rest-auth (JWT login / logout)
     path("api/auth/", include("dj_rest_auth.urls")),
     path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
 
     # 🌐 Allauth (Google OAuth)
-    path("accounts/", include("accounts.urls")),
     path("accounts/", include("allauth.urls")),
-    path("api/auth/", include("accounts.urls")),
-    path("api/files/", include("files.urls")),
 
+    # 📁 File APIs
+    path("api/files/", include("files.urls")),
 ]
+
+# 📂 Media files (uploads)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
