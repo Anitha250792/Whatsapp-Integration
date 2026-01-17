@@ -155,6 +155,10 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SECURE = True
 
+SOCIALACCOUNT_LOGIN_ON_GET = True
+LOGIN_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/dashboard"
+LOGOUT_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/login"
+
 
 # --------------------------------------------------
 # URL / TEMPLATES
