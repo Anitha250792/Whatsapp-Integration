@@ -28,25 +28,28 @@ class UploadFileView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser]
 
-    def post(self, request):
-        uploaded_file = request.FILES.get("file")
+def post(self, request):
+    uploaded_file = request.FILES.get("file")
 
-        if not uploaded_file:
-            return Response(
-                {"error": "No file provided"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+    if not uploaded_file:
+        return Response({"error": "No file provided"}, status=400)
 
+    try:
         file_obj = File.objects.create(
             user=request.user,
             file=uploaded_file,
             filename=uploaded_file.name,
         )
+        print("FILE SAVED:", file_obj.file.path)
 
+    except Exception as e:
+        print("UPLOAD ERROR:", str(e))
         return Response(
-            FileSerializer(file_obj).data,
-            status=status.HTTP_201_CREATED
+            {"error": str(e)},
+            status=500
         )
+
+    return Response(FileSerializer(file_obj).data, status=201)
 
 
 class DeleteFileView(APIView):
