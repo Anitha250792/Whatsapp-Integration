@@ -5,9 +5,15 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/auth/", include("dj_rest_auth.urls")),
-    path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
-    path("accounts/", include("allauth.urls")),
+
+    # 🔐 JWT auth (email/password)
+    path("auth/", include("dj_rest_auth.urls")),
+    path("auth/registration/", include("dj_rest_auth.registration.urls")),
+
+    # 🔐 Google JWT login (custom API)
+    path("accounts/", include("accounts.urls")),
+
+    # 📁 File APIs (NO /api)
     path("files/", include("files.urls")),
 ]
 
