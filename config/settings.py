@@ -129,6 +129,7 @@ REST_FRAMEWORK = {
 # GOOGLE OAUTH
 # -------------------------------------------------
 
+
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "SCOPE": ["profile", "email"],
@@ -142,20 +143,20 @@ SOCIALACCOUNT_PROVIDERS = {
     "facebook": {
         "METHOD": "oauth2",
         "SCOPE": ["email", "public_profile"],
-        "FIELDS": [
-            "id",
-            "email",
-            "name",
-            "first_name",
-            "last_name",
-            "picture",
-        ],
+        "FIELDS": ["email", "name", "first_name", "last_name"],
         "AUTH_PARAMS": {"auth_type": "reauthenticate"},
         "EXCHANGE_TOKEN": True,
         "VERIFIED_EMAIL": False,
-        "VERSION": "v18.0",
+        "VERSION": "v19.0",
     },
 }
+
+# ✅ Facebook App credentials (MUST be strings)
+SOCIALACCOUNT_PROVIDERS["facebook"]["APP"] = {
+    "client_id": os.getenv("FACEBOOK_CLIENT_ID", "855828883746213"),
+    "secret": os.getenv("FACEBOOK_CLIENT_SECRET"),
+}
+
 # --------------------------------------------------
 # CORS
 # --------------------------------------------------
