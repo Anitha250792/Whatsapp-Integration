@@ -2,7 +2,7 @@ from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.parsers import MultiPartParser
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
 import tempfile, os, zipfile
@@ -27,30 +27,26 @@ class FileListView(APIView):
 
 
 # ⬆ Upload
-import logging
-logger = logging.getLogger(__name__)
-
 class UploadFileView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser]
+    parser_classes = [MultiPartParser, FormParser]   # 🔥 REQUIRED
 
     def post(self, request):
-        uploaded_file = request.FILES.get("file")
+        file = request.FILES.get("file")
 
-        logger.error("MEDIA_ROOT = %s", settings.MEDIA_ROOT)
-        logger.error("FILES = %s", request.FILES)
+        if not file:
+            return Response({"error": "No file uploaded"}, status=400)
 
-        if not uploaded_file:
-            return Response({"error": "No file"}, status=400)
-
-        file_obj = File.objects.create(
+        uploaded = File.objects.create(
             user=request.user,
-            file=uploaded_file,
-            filename=uploaded_file.name,
+            file=file,
+            filename=file.name
         )
 
-        return Response(FileSerializer(file_obj).data, status=201)
-
+        return Response({
+            "id": uploaded.id,
+            "filename": uploaded.filename,
+        }, status=201)
 
 
 # ❌ Delete
