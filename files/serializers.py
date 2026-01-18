@@ -1,5 +1,7 @@
 from rest_framework import serializers
+from django.urls import reverse
 from .models import File
+
 
 class FileSerializer(serializers.ModelSerializer):
     download_url = serializers.SerializerMethodField()
@@ -10,6 +12,8 @@ class FileSerializer(serializers.ModelSerializer):
 
     def get_download_url(self, obj):
         request = self.context.get("request")
-        return request.build_absolute_uri(
-            f"files/download/{obj.id}/"
-        )
+        if request is None:
+            return None
+
+        url = reverse("file-download", args=[obj.id])
+        return request.build_absolute_uri(url)

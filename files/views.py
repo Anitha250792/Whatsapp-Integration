@@ -22,9 +22,13 @@ class FileListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        files = File.objects.filter(user=request.user)
-        return Response(FileSerializer(files, many=True).data)
-
+        files = File.objects.filter(user=request.user).order_by("-id")
+        serializer = FileSerializer(
+            files,
+            many=True,
+            context={"request": request}
+        )
+        return Response(serializer.data)
 
 # ⬆ Upload
 class UploadFileView(APIView):
