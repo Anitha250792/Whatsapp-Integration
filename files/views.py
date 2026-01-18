@@ -1,4 +1,4 @@
-from django.http import FileResponse
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -29,24 +29,21 @@ class UploadFileView(APIView):
     parser_classes = [MultiPartParser]
 
     def post(self, request):
-        uploaded_file = request.FILES.get("file")
+    uploaded_file = request.FILES.get("file")
 
-        if not uploaded_file:
-            return Response(
-                {"error": "No file provided"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+    if not uploaded_file:
+        return Response({"error": "No file provided"}, status=400)
 
-        file_obj = File.objects.create(
-            user=request.user,
-            file=uploaded_file,
-            filename=uploaded_file.name,
-        )
+    file_obj = File.objects.create(
+        user=request.user,
+        file=uploaded_file,
+        filename=uploaded_file.name,
+    )
 
-        return Response(
-            FileSerializer(file_obj).data,
-            status=status.HTTP_201_CREATED
-        )
+    print("FILE SAVED AT:", file_obj.file.path)
+
+    return Response(FileSerializer(file_obj).data, status=201)
+
 
 class DeleteFileView(APIView):
     permission_classes = [IsAuthenticated]
@@ -63,7 +60,15 @@ class DownloadFileView(APIView):
 
     def get(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
-        return FileResponse(open(obj.file.path, "rb"), as_attachment=True)
+
+        if not obj.file or not os.path.exists(obj.file.path):
+            raise Http404("File not found on server")
+
+        return FileResponse(
+            obj.file.open("rb"),
+            as_attachment=True,
+            filename=obj.filename
+        )
 
 
 class WordToPDFView(APIView):

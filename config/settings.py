@@ -219,8 +219,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
-
-os.makedirs(MEDIA_ROOT, exist_ok=True)
+if not os.path.exists(MEDIA_ROOT):
+    os.makedirs(MEDIA_ROOT)
 
 # ===============================
 # File upload limits (Render safe)
