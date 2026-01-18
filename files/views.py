@@ -27,6 +27,9 @@ class FileListView(APIView):
 
 
 # ⬆ Upload
+import logging
+logger = logging.getLogger(__name__)
+
 class UploadFileView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser]
@@ -34,11 +37,11 @@ class UploadFileView(APIView):
     def post(self, request):
         uploaded_file = request.FILES.get("file")
 
+        logger.error("MEDIA_ROOT = %s", settings.MEDIA_ROOT)
+        logger.error("FILES = %s", request.FILES)
+
         if not uploaded_file:
-            return Response(
-                {"error": "No file provided"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "No file"}, status=400)
 
         file_obj = File.objects.create(
             user=request.user,
@@ -46,10 +49,8 @@ class UploadFileView(APIView):
             filename=uploaded_file.name,
         )
 
-        return Response(
-            FileSerializer(file_obj).data,
-            status=status.HTTP_201_CREATED
-        )
+        return Response(FileSerializer(file_obj).data, status=201)
+
 
 
 # ❌ Delete
