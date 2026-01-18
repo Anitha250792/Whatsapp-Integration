@@ -34,7 +34,7 @@ class UploadFileView(APIView):
         if not uploaded_file:
             return Response(
                 {"error": "No file provided"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         file_obj = File.objects.create(
@@ -45,7 +45,7 @@ class UploadFileView(APIView):
 
         return Response(
             FileSerializer(file_obj).data,
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_201_CREATED
         )
 
 class DeleteFileView(APIView):
