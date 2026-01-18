@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.facebook",
 
     # Local apps
     "accounts",
@@ -127,6 +128,7 @@ REST_FRAMEWORK = {
 # --------------------------------------------------
 # GOOGLE OAUTH
 # -------------------------------------------------
+
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "SCOPE": ["profile", "email"],
@@ -135,7 +137,24 @@ SOCIALACCOUNT_PROVIDERS = {
             "GOOGLE_CLIENT_ID",
             "437563404520-eoq5p4n40kl46kiijqgpneeol0snacjk.apps.googleusercontent.com"
         ),
-    }
+    },
+
+    "facebook": {
+        "METHOD": "oauth2",
+        "SCOPE": ["email", "public_profile"],
+        "FIELDS": [
+            "id",
+            "email",
+            "name",
+            "first_name",
+            "last_name",
+            "picture",
+        ],
+        "AUTH_PARAMS": {"auth_type": "reauthenticate"},
+        "EXCHANGE_TOKEN": True,
+        "VERIFIED_EMAIL": False,
+        "VERSION": "v18.0",
+    },
 }
 # --------------------------------------------------
 # CORS
