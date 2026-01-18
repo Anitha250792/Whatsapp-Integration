@@ -11,5 +11,5 @@ class FileSerializer(serializers.ModelSerializer):
     def get_download_url(self, obj):
         request = self.context.get("request")
         return request.build_absolute_uri(
-            f"/api/files/download/{obj.id}/"
+            f"files/download/{obj.id}/"
         )

@@ -24,34 +24,39 @@ class FileListView(APIView):
         files = File.objects.filter(user=request.user)
         return Response(FileSerializer(files, many=True).data)
 
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser
+from rest_framework.response import Response
+from rest_framework import status
+
+from .models import File
+from .serializers import FileSerializer
+
 class UploadFileView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser]
 
-def post(self, request):
-    uploaded_file = request.FILES.get("file")
+    def post(self, request):
+        uploaded_file = request.FILES.get("file")
 
-    if not uploaded_file:
-        return Response({"error": "No file provided"}, status=400)
+        if not uploaded_file:
+            return Response(
+                {"error": "No file provided"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-    try:
         file_obj = File.objects.create(
             user=request.user,
             file=uploaded_file,
             filename=uploaded_file.name,
         )
-        print("FILE SAVED:", file_obj.file.path)
 
-    except Exception as e:
-        print("UPLOAD ERROR:", str(e))
         return Response(
-            {"error": str(e)},
-            status=500
+            FileSerializer(file_obj).data,
+            status=status.HTTP_201_CREATED
         )
-
-    return Response(FileSerializer(file_obj).data, status=201)
-
-
+    
 class DeleteFileView(APIView):
     permission_classes = [IsAuthenticated]
 
