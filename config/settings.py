@@ -15,12 +15,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY
 # --------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-change-this-in-production")
-DEBUG = False
+DEBUG = True
 
-ALLOWED_HOSTS = os.getenv(
-    "ALLOWED_HOSTS",
-    "localhost,127.0.0.1"
-).split(",")
+
+ALLOWED_HOSTS = [
+    "whatsapp-integration-u7tq.onrender.com",
+]
 
 
 # --------------------------------------------------
@@ -153,8 +153,8 @@ SOCIALACCOUNT_PROVIDERS = {
 # CORS
 # --------------------------------------------------
 CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOWED_ORIGINS = [
-    "https://whatsapp-integration-frontend-green.vercel.app",
+CSRF_TRUSTED_ORIGINS = [
+    "https://whatsapp-integration-u7tq.onrender.com",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
