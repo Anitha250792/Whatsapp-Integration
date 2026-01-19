@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
     "allauth.socialaccount.providers.facebook",
-
+    
     # Local apps
     "accounts",
     "files",
@@ -144,18 +144,10 @@ SOCIALACCOUNT_PROVIDERS = {
         "METHOD": "oauth2",
         "SCOPE": ["email", "public_profile"],
         "FIELDS": ["email", "name", "first_name", "last_name"],
-        "AUTH_PARAMS": {"auth_type": "reauthenticate"},
-        "EXCHANGE_TOKEN": True,
-        "VERIFIED_EMAIL": False,
-        "VERSION": "v19.0",
+        "VERSION": "v18.0",
     },
 }
 
-# ✅ Facebook App credentials (MUST be strings)
-SOCIALACCOUNT_PROVIDERS["facebook"]["APP"] = {
-    "client_id": os.getenv("FACEBOOK_CLIENT_ID", "855828883746213"),
-    "secret": os.getenv("FACEBOOK_CLIENT_SECRET"),
-}
 
 # --------------------------------------------------
 # CORS
