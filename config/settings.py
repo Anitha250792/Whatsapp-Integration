@@ -141,8 +141,13 @@ SOCIALACCOUNT_PROVIDERS = {
 
     "facebook": {
         "METHOD": "oauth2",
-        "SCOPE": ["email", "public_profile"],
-        "FIELDS": ["email", "name", "first_name", "last_name"],
+        "SCOPE": ["public_profile"],   # ✅ DO NOT request email
+        "FIELDS": [
+            "id",
+            "name",
+            "first_name",
+            "last_name",
+        ],
         "VERSION": "v18.0",
     },
 }
