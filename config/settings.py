@@ -83,14 +83,6 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
-# --------------------------------------------------
-# ALLAUTH REQUIRED ADAPTERS (FIXES 500 ERROR)
-# --------------------------------------------------
-ACCOUNT_ADAPTER = "allauth.account.adapter.DefaultAccountAdapter"
-SOCIALACCOUNT_ADAPTER = "allauth.socialaccount.adapter.DefaultSocialAccountAdapter"
-
-
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # --------------------------------------------------
 # DJ-REST-AUTH
@@ -141,17 +133,24 @@ SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "SCOPE": ["profile", "email"],
         "AUTH_PARAMS": {"access_type": "online"},
+        "CLIENT_ID": os.getenv(
+            "GOOGLE_CLIENT_ID",
+            "437563404520-eoq5p4n40kl46kiijqgpneeol0snacjk.apps.googleusercontent.com"
+        ),
     },
+
     "facebook": {
         "METHOD": "oauth2",
-        "SCOPE": ["public_profile", "email"],
-        "FIELDS": ["id", "email", "name"],
-        
+        "SCOPE": ["public_profile"],   # ✅ DO NOT request email
+        "FIELDS": [
+            "id",
+            "name",
+            "first_name",
+            "last_name",
+        ],
+        "VERSION": "v18.0",
     },
 }
-
-SOCIALACCOUNT_AUTO_SIGNUP = True
-SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
 
 
 # --------------------------------------------------
@@ -171,10 +170,9 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SECURE = True
 
-LOGIN_REDIRECT_URL = "/accounts/success/"
-LOGOUT_REDIRECT_URL = "/"
-LOGIN_URL = "/accounts/login/"
-
+SOCIALACCOUNT_LOGIN_ON_GET = True
+LOGIN_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/dashboard"
+LOGOUT_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/login"
 
 
 # --------------------------------------------------
