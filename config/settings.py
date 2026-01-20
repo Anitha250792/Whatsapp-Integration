@@ -141,9 +141,10 @@ SOCIALACCOUNT_PROVIDERS = {
 
     "facebook": {
         "METHOD": "oauth2",
-        "SCOPE": ["public_profile"],   # ✅ DO NOT request email
+        "SCOPE": ["public_profile", "email"],   # ✅ DO NOT request email
         "FIELDS": [
             "id",
+            "email",
             "name",
             "first_name",
             "last_name",
@@ -152,6 +153,9 @@ SOCIALACCOUNT_PROVIDERS = {
     },
 }
 
+SOCIALACCOUNT_AUTO_SIGNUP = True
+
+SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
 
 # --------------------------------------------------
 # CORS
