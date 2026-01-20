@@ -83,6 +83,13 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
+# --------------------------------------------------
+# ALLAUTH REQUIRED ADAPTERS (FIXES 500 ERROR)
+# --------------------------------------------------
+ACCOUNT_ADAPTER = "allauth.account.adapter.DefaultAccountAdapter"
+SOCIALACCOUNT_ADAPTER = "allauth.socialaccount.adapter.DefaultSocialAccountAdapter"
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # --------------------------------------------------
 # DJ-REST-AUTH
@@ -132,12 +139,13 @@ REST_FRAMEWORK = {
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "SCOPE": ["profile", "email"],
+        "AUTH_PARAMS": {"access_type": "online"},
     },
     "facebook": {
         "METHOD": "oauth2",
         "SCOPE": ["public_profile", "email"],
         "FIELDS": ["id", "email", "name"],
-        "VERSION": "v18.0",
+        
     },
 }
 
