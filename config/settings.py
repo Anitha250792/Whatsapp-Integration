@@ -132,19 +132,11 @@ REST_FRAMEWORK = {
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "SCOPE": ["profile", "email"],
-        "AUTH_PARAMS": {"access_type": "online"},
     },
-
     "facebook": {
         "METHOD": "oauth2",
         "SCOPE": ["public_profile", "email"],
-        "FIELDS": [
-            "id",
-            "email",
-            "name",
-            "first_name",
-            "last_name",
-        ],
+        "FIELDS": ["id", "email", "name"],
         "VERSION": "v18.0",
     },
 }
@@ -171,8 +163,8 @@ CSRF_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SECURE = True
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
-LOGIN_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/dashboard"
-LOGOUT_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/login"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
 
 
 # --------------------------------------------------
