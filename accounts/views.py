@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from django.conf import settings
+from django.http import HttpResponse
 
 User = get_user_model()
 
@@ -42,3 +43,16 @@ class GoogleLoginAPIView(APIView):
             "refresh": str(refresh),
             "email": user.email,
         })
+    
+def privacy_policy(request):
+    return HttpResponse("""
+        <h1>Privacy Policy</h1>
+        <p>This application uses social login (Google and Facebook) only for authentication.</p>
+        <p>No personal data is shared with third parties.</p>
+    """)
+
+def terms_of_service(request):
+    return HttpResponse("""
+        <h1>Terms of Service</h1>
+        <p>This application is intended for file integration and authentication purposes only.</p>
+    """)
