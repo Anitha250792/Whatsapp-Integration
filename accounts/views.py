@@ -45,25 +45,36 @@ class GoogleLoginAPIView(APIView):
             "email": user.email,
         })
     
-def privacy_policy_view(request):
-    return HttpResponse("""
-    <h1>Privacy Policy</h1>
-    <p>This application uses Google and Facebook login only for authentication.</p>
-    <p>No personal data is shared with third parties.</p>
-    """)
+def privacy_policy(request):
+    return HttpResponse(
+        """
+        <h1>Privacy Policy</h1>
+        <p>This application uses social login (Google and Facebook) only for authentication.</p>
+        <p>No personal data is shared with third parties.</p>
+        """,
+        content_type="text/html"
+    )
 
-def terms_view(request):
-    return HttpResponse("""
-    <h1>Terms of Service</h1>
-    <p>This application is intended for file integration and authentication purposes only.</p>
-    """)
+
+def terms_of_service(request):
+    return HttpResponse(
+        """
+        <h1>Terms of Service</h1>
+        <p>This application is intended for file integration and authentication purposes only.</p>
+        """,
+        content_type="text/html"
+    )
+
 
 def data_deletion_view(request):
-    return HttpResponse("""
-    <h1>User Data Deletion</h1>
-    <p>
-    To delete your data, please email:
-    <b>ntanithasaravanan@gmail.com</b>
-    with your registered email ID.
-    </p>
-    """)
+    return HttpResponse(
+        """
+        <h1>User Data Deletion</h1>
+        <p>
+        To delete your account and associated data, please email:
+        <b>ntanithasaravanan@gmail.com</b>
+        with your registered email address.
+        </p>
+        """,
+        content_type="text/html"
+    )
