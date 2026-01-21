@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from google.oauth2 import id_token
@@ -58,15 +58,5 @@ def terms_of_service(request):
     """)
 
 
-class SocialJWTView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        refresh = RefreshToken.for_user(request.user)
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-            "email": request.user.email,
-        })
     
     
