@@ -10,12 +10,13 @@ urlpatterns = [
     path("auth/", include("dj_rest_auth.urls")),
     path("auth/registration/", include("dj_rest_auth.registration.urls")),
 
-    # 🔐 Google JWT login (custom API)
-    path("accounts/", include("accounts.urls")),
-
+    # 🔐 Allauth (Google / Facebook)
     path("accounts/", include("allauth.urls")),
 
-    # 📁 File APIs (NO /api)
+    # 🔐 Custom account APIs + privacy/terms pages
+    path("", include("accounts.urls")),
+
+    # 📁 File APIs
     path("files/", include("files.urls")),
 ]
 
