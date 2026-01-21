@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from google.oauth2 import id_token
@@ -44,17 +45,17 @@ class GoogleLoginAPIView(APIView):
             "email": user.email,
         })
     
-def privacy_policy(request):
+def privacy_policy_view(request):
     return HttpResponse("""
-        <h1>Privacy Policy</h1>
-        <p>This application uses social login (Google and Facebook) only for authentication.</p>
-        <p>No personal data is shared with third parties.</p>
+    <h1>Privacy Policy</h1>
+    <p>This application uses Google and Facebook login only for authentication.</p>
+    <p>No personal data is shared with third parties.</p>
     """)
 
-def terms_of_service(request):
+def terms_view(request):
     return HttpResponse("""
-        <h1>Terms of Service</h1>
-        <p>This application is intended for file integration and authentication purposes only.</p>
+    <h1>Terms of Service</h1>
+    <p>This application is intended for file integration and authentication purposes only.</p>
     """)
 
 def data_deletion_view(request):
