@@ -56,3 +56,13 @@ def terms_of_service(request):
         <h1>Terms of Service</h1>
         <p>This application is intended for file integration and authentication purposes only.</p>
     """)
+
+def data_deletion_view(request):
+    return HttpResponse("""
+    <h1>User Data Deletion</h1>
+    <p>
+    To delete your data, please email:
+    <b>ntanithasaravanan@gmail.com</b>
+    with your registered email ID.
+    </p>
+    """)
