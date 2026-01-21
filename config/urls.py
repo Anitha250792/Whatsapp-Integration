@@ -2,8 +2,12 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from accounts import views as account_views
 
 urlpatterns = [
+     path("privacy-policy/", account_views.privacy_policy),
+    path("terms/", account_views.terms_of_service),
+    path("data-deletion/", account_views.data_deletion_view),
     path("admin/", admin.site.urls),
 
     # 🔐 JWT auth (email/password)
