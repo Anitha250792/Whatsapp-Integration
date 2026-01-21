@@ -56,5 +56,17 @@ def terms_of_service(request):
         <h1>Terms of Service</h1>
         <p>This application is intended for file integration and authentication purposes only.</p>
     """)
+
+
+class SocialJWTView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        refresh = RefreshToken.for_user(request.user)
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "email": request.user.email,
+        })
     
     

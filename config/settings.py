@@ -83,6 +83,8 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
+ACCOUNT_ADAPTER = "allauth.account.adapter.DefaultAccountAdapter"
+SOCIALACCOUNT_ADAPTER = "allauth.socialaccount.adapter.DefaultSocialAccountAdapter"
 
 # --------------------------------------------------
 # DJ-REST-AUTH
@@ -176,7 +178,7 @@ CSRF_COOKIE_SECURE = True
 SOCIALACCOUNT_LOGIN_ON_GET = True
 LOGIN_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/dashboard"
 LOGOUT_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/login"
-
+LOGIN_URL = "https://whatsapp-integration-frontend-green.vercel.app/login"
 
 # --------------------------------------------------
 # URL / TEMPLATES
