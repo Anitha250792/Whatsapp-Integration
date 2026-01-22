@@ -17,7 +17,7 @@ urlpatterns = [
     # 🔐 Google JWT login (custom API)
     path("accounts/", include("accounts.urls")),
 
-    path("accounts/", include("allauth.urls")),
+   
 
     # 📁 File APIs (NO /api)
     path("files/", include("files.urls")),

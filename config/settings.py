@@ -71,7 +71,7 @@ MIDDLEWARE = [
 # --------------------------------------------------
 # AUTH / ALLAUTH CONFIG
 # --------------------------------------------------
-SITE_ID = 1
+
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
@@ -83,8 +83,7 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
-ACCOUNT_ADAPTER = "allauth.account.adapter.DefaultAccountAdapter"
-SOCIALACCOUNT_ADAPTER = "allauth.socialaccount.adapter.DefaultSocialAccountAdapter"
+
 
 # --------------------------------------------------
 # DJ-REST-AUTH
@@ -141,12 +140,7 @@ SOCIALACCOUNT_PROVIDERS = {
         ),
     },
 
-     "facebook": {
-        "METHOD": "oauth2",
-        "SCOPE": ["email", "public_profile"],
-        "FIELDS": ["id", "email", "name", "first_name", "last_name"],
-        "VERSION": "v18.0",
-    },
+    
 }
 
 

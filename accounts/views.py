@@ -72,3 +72,50 @@ def data_deletion_view(request):
         </p>
         """
     )
+
+class FacebookLoginAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        access_token = request.data.get("access_token")
+
+        if not access_token:
+            return Response({"error": "Access token missing"}, status=400)
+
+        # 🔎 Verify token with Facebook
+        fb_url = (
+            "https://graph.facebook.com/me"
+            "?fields=id,name,email"
+            f"&access_token={access_token}"
+        )
+
+        fb_response = requests.get(fb_url)
+        data = fb_response.json()
+
+        if "error" in data:
+            return Response({"error": "Invalid Facebook token"}, status=400)
+
+        email = data.get("email")
+        name = data.get("name", "")
+
+        if not email:
+            return Response(
+                {"error": "Facebook account has no email"},
+                status=400,
+            )
+
+        user, _ = User.objects.get_or_create(
+            email=email,
+            defaults={
+                "username": email,
+                "first_name": name,
+            },
+        )
+
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "email": user.email,
+        })
