@@ -8,6 +8,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from django.conf import settings
 from django.http import HttpResponse
+import requests
 
 User = get_user_model()
 
@@ -82,15 +83,14 @@ class FacebookLoginAPIView(APIView):
         if not access_token:
             return Response({"error": "Access token missing"}, status=400)
 
-        # 🔎 Verify token with Facebook
-        fb_url = (
-            "https://graph.facebook.com/me"
-            "?fields=id,name,email"
-            f"&access_token={access_token}"
-        )
+        fb_url = "https://graph.facebook.com/me"
+        params = {
+            "fields": "id,name,email",
+            "access_token": access_token,
+        }
 
-        fb_response = requests.get(fb_url)
-        data = fb_response.json()
+        fb_res = requests.get(fb_url, params=params)
+        data = fb_res.json()
 
         if "error" in data:
             return Response({"error": "Invalid Facebook token"}, status=400)
@@ -101,15 +101,12 @@ class FacebookLoginAPIView(APIView):
         if not email:
             return Response(
                 {"error": "Facebook account has no email"},
-                status=400,
+                status=400
             )
 
         user, _ = User.objects.get_or_create(
             email=email,
-            defaults={
-                "username": email,
-                "first_name": name,
-            },
+            defaults={"username": email, "first_name": name},
         )
 
         refresh = RefreshToken.for_user(user)
