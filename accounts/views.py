@@ -51,20 +51,16 @@ def privacy_policy(request):
         <h1>Privacy Policy</h1>
         <p>This application uses social login (Google and Facebook) only for authentication.</p>
         <p>No personal data is shared with third parties.</p>
-        """,
-        content_type="text/html"
+        """
     )
-
 
 def terms_of_service(request):
     return HttpResponse(
         """
         <h1>Terms of Service</h1>
         <p>This application is intended for file integration and authentication purposes only.</p>
-        """,
-        content_type="text/html"
+        """
     )
-
 
 def data_deletion_view(request):
     return HttpResponse(
@@ -72,9 +68,7 @@ def data_deletion_view(request):
         <h1>User Data Deletion</h1>
         <p>
         To delete your account and associated data, please email:
-        <b>ntanithasaravanan@gmail.com</b>
-        with your registered email address.
+        <b>ntanithasaravanan@gmail.com</b> using your registered email.
         </p>
-        """,
-        content_type="text/html"
+        """
     )
