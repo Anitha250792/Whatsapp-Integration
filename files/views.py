@@ -2,6 +2,7 @@ from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
@@ -166,15 +167,17 @@ class SignPDFView(APIView):
         sign_pdf(obj.file.path, tmp.name, signer)
         return FileResponse(open(tmp.name, "rb"), as_attachment=True)
 
-# views.py
-class PublicDownloadFileView(APIView):
-    permission_classes = []
+class PublicDownloadView(APIView):
+    permission_classes = [AllowAny]
 
     def get(self, request, token):
         obj = get_object_or_404(File, public_token=token)
+
+        if not obj.file or not os.path.exists(obj.file.path):
+            raise Http404("File not found")
+
         return FileResponse(
             obj.file.open("rb"),
             as_attachment=True,
             filename=obj.filename,
         )
-
