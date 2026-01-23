@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+import uuid
 
 class File(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -9,3 +10,4 @@ class File(models.Model):
 
     def __str__(self):
         return self.filename
+    public_token = models.UUIDField(default=uuid.uuid4, unique=True)

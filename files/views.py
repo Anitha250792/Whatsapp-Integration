@@ -16,6 +16,7 @@ from .converters import (
     split_pdf,
     sign_pdf,
 )
+import mimetypes
 
 # 📂 List files
 class FileListView(APIView):
@@ -71,14 +72,23 @@ class DownloadFileView(APIView):
     def get(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
 
-        if not obj.file or not os.path.exists(obj.file.path):
-            raise Http404("File not found on server")
+        file_path = obj.file.path
+        if not os.path.exists(file_path):
+            raise Http404("File not found")
 
-        return FileResponse(
-            obj.file.open("rb"),
-            as_attachment=True,
-            filename=obj.filename
+        content_type, _ = mimetypes.guess_type(file_path)
+        content_type = content_type or "application/octet-stream"
+
+        response = FileResponse(
+            open(file_path, "rb"),
+            content_type=content_type,
         )
+
+        # 🔥 CRITICAL for WhatsApp
+        response["Content-Disposition"] = f'attachment; filename="{obj.filename}"'
+        response["X-Content-Type-Options"] = "nosniff"
+
+        return response
 
 
 # 🔁 Word → PDF
@@ -155,3 +165,20 @@ class SignPDFView(APIView):
         tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
         sign_pdf(obj.file.path, tmp.name, signer)
         return FileResponse(open(tmp.name, "rb"), as_attachment=True)
+
+# views.py
+class PublicDownloadView(APIView):
+    permission_classes = []
+
+    def get(self, request, token):
+        obj = get_object_or_404(File, public_token=token)
+
+        file_path = obj.file.path
+        content_type, _ = mimetypes.guess_type(file_path)
+
+        response = FileResponse(
+            open(file_path, "rb"),
+            content_type=content_type or "application/octet-stream",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{obj.filename}"'
+        return response

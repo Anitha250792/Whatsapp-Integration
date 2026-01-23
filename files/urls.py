@@ -9,6 +9,7 @@ from .views import (
     MergePDFView,
     SplitPDFView,
     SignPDFView,
+    PublicDownloadView,
 )
 
 urlpatterns = [
@@ -22,4 +23,5 @@ urlpatterns = [
     path("merge/", MergePDFView.as_view()),
     path("split/<int:file_id>/", SplitPDFView.as_view()),
     path("sign/<int:file_id>/", SignPDFView.as_view()),
+    path("public/<uuid:token>/", PublicDownloadView.as_view()),
 ]
