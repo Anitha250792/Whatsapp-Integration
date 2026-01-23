@@ -10,25 +10,16 @@ class FileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = File
-        fields = [
-            "id",
-            "filename",
-            "download_url",  # 🔐 authenticated download
-            "public_url",    # 🌍 WhatsApp share link
-        ]
+        fields = ["id", "filename", "download_url", "public_url"]
 
     def get_download_url(self, obj):
         request = self.context.get("request")
-        if request is None:
-            return None
-
-        url = reverse("file-download", args=[obj.id])
-        return request.build_absolute_uri(url)
+        return request.build_absolute_uri(
+            reverse("file-download", args=[obj.id])
+        )
 
     def get_public_url(self, obj):
         request = self.context.get("request")
-        if request is None:
-            return None
-
-        url = reverse("file-public", args=[obj.public_token])
-        return request.build_absolute_uri(url)
+        return request.build_absolute_uri(
+            reverse("file-public", args=[obj.public_token])
+        )

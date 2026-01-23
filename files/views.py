@@ -167,18 +167,14 @@ class SignPDFView(APIView):
         return FileResponse(open(tmp.name, "rb"), as_attachment=True)
 
 # views.py
-class PublicDownloadView(APIView):
+class PublicDownloadFileView(APIView):
     permission_classes = []
 
     def get(self, request, token):
         obj = get_object_or_404(File, public_token=token)
-
-        file_path = obj.file.path
-        content_type, _ = mimetypes.guess_type(file_path)
-
-        response = FileResponse(
-            open(file_path, "rb"),
-            content_type=content_type or "application/octet-stream",
+        return FileResponse(
+            obj.file.open("rb"),
+            as_attachment=True,
+            filename=obj.filename,
         )
-        response["Content-Disposition"] = f'attachment; filename="{obj.filename}"'
-        return response
+
