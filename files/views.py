@@ -170,12 +170,17 @@ class SignPDFView(APIView):
         return FileResponse(open(tmp.name, "rb"), as_attachment=True)
 
 class PublicDownloadView(APIView):
-    permission_classes = [AllowAny]
+    authentication_classes = []
+    permission_classes = []
 
     def get(self, request, token):
-        file = get_object_or_404(File, public_token=token)
+        obj = get_object_or_404(File, public_token=token)
+
+        if not obj.file:
+            raise Http404
+
         return FileResponse(
-            file.file.open("rb"),
+            obj.file.open("rb"),
             as_attachment=True,
-            filename=file.filename
+            filename=obj.filename
         )
