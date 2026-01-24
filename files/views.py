@@ -6,6 +6,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.generics import ListAPIView
+
 import tempfile, os, zipfile
 
 from .models import File
@@ -20,18 +22,18 @@ from .converters import (
 import mimetypes
 
 # 📂 List files
-class FileListView(APIView):
+# files/views.py
+class FileListView(ListAPIView):
+    serializer_class = FileSerializer
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        files = File.objects.filter(user=request.user).order_by("-id")
-        serializer = FileSerializer(
-            files,
-            many=True,
-            context={"request": request}
-        )
-        return Response(serializer.data)
+    def get_queryset(self):
+        return File.objects.filter(user=self.request.user)
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
 
 # ⬆ Upload

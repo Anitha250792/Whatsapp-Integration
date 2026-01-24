@@ -1,7 +1,7 @@
+# files/serializers.py
 from rest_framework import serializers
 from django.urls import reverse
 from .models import File
-
 
 class FileSerializer(serializers.ModelSerializer):
     download_url = serializers.SerializerMethodField()
@@ -19,7 +19,9 @@ class FileSerializer(serializers.ModelSerializer):
 
     def get_public_url(self, obj):
         request = self.context.get("request")
+        if not obj.public_token:
+            return None
+
         return request.build_absolute_uri(
             reverse("file-public", args=[obj.public_token])
         )
-
