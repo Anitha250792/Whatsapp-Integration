@@ -144,24 +144,6 @@ SOCIALACCOUNT_PROVIDERS = {
         ),
     },
 
-     "facebook": {
-        "METHOD": "oauth2",
-        "SCOPE": [
-            "email",
-            "public_profile",
-            "instagram_basic",
-        ],
-        "FIELDS": [
-            "id",
-            "email",
-            "name",
-            "picture",
-        ],
-        "EXCHANGE_TOKEN": True,
-        "VERIFIED_EMAIL": False,
-        "VERSION": "v19.0",
-    },
-
     
 }
 
