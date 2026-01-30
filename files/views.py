@@ -2,13 +2,15 @@ from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.permissions import AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 
-import tempfile, os, zipfile
+import tempfile
+import os
+import zipfile
+import mimetypes
 
 from .models import File
 from .serializers import FileSerializer
@@ -19,10 +21,10 @@ from .converters import (
     split_pdf,
     sign_pdf,
 )
-import mimetypes
 
-# 📂 List files
-# files/views.py
+# ==============================
+# 📂 LIST FILES
+# ==============================
 class FileListView(ListAPIView):
     serializer_class = FileSerializer
     permission_classes = [IsAuthenticated]
@@ -34,141 +36,203 @@ class FileListView(ListAPIView):
         return {"request": self.request}
 
 
-# ⬆ Upload
+# ==============================
+# ⬆ UPLOAD
+# ==============================
 class UploadFileView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]   # 🔥 REQUIRED
+    parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
-        file = request.FILES.get("file")
+        uploaded_file = request.FILES.get("file")
 
-        if not file:
+        if not uploaded_file:
             return Response({"error": "No file uploaded"}, status=400)
 
-        uploaded = File.objects.create(
+        obj = File.objects.create(
             user=request.user,
-            file=file,
-            filename=file.name
+            file=uploaded_file,
+            filename=uploaded_file.name,
         )
 
-        return Response({
-            "id": uploaded.id,
-            "filename": uploaded.filename,
-        }, status=201)
+        return Response(
+            {"id": obj.id, "filename": obj.filename},
+            status=201
+        )
 
 
-# ❌ Delete
+# ==============================
+# ❌ DELETE
+# ==============================
 class DeleteFileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
-        obj.file.delete()
+        obj.file.delete(save=False)
         obj.delete()
         return Response({"message": "Deleted"})
 
 
-# ⬇ Download
+# ==============================
+# ⬇ DOWNLOAD (AUTH)
+# ==============================
 class DownloadFileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
 
-        file_path = obj.file.path
-        if not os.path.exists(file_path):
+        if not obj.file or not os.path.exists(obj.file.path):
             raise Http404("File not found")
 
-        content_type, _ = mimetypes.guess_type(file_path)
+        content_type, _ = mimetypes.guess_type(obj.file.path)
         content_type = content_type or "application/octet-stream"
 
         response = FileResponse(
-            open(file_path, "rb"),
+            obj.file.open("rb"),
             content_type=content_type,
+            as_attachment=True,
+            filename=obj.filename,
         )
-
-        # 🔥 CRITICAL for WhatsApp
-        response["Content-Disposition"] = f'attachment; filename="{obj.filename}"'
         response["X-Content-Type-Options"] = "nosniff"
-
         return response
 
 
-# 🔁 Word → PDF
+# ==============================
+# 🔁 WORD → PDF
+# ==============================
 class WordToPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
+
         tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+        tmp.close()
+
         word_to_pdf(obj.file.path, tmp.name)
-        return FileResponse(open(tmp.name, "rb"), as_attachment=True)
+
+        return FileResponse(
+            open(tmp.name, "rb"),
+            as_attachment=True,
+            filename="converted.pdf"
+        )
 
 
-# 🔁 PDF → Word
+# ==============================
+# 🔁 PDF → WORD
+# ==============================
 class PDFToWordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        file_obj = get_object_or_404(File, id=file_id, user=request.user)
+        obj = get_object_or_404(File, id=file_id, user=request.user)
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+        tmp.close()
 
         try:
-            with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
-                pdf_to_word(file_obj.file.path, tmp.name)
-                return FileResponse(
-                    open(tmp.name, "rb"),
-                    as_attachment=True,
-                    filename="converted.docx"
-                )
+            pdf_to_word(obj.file.path, tmp.name)
         except ValueError:
             return Response(
-                {"error": "Scanned PDFs need OCR"},
+                {"error": "Scanned PDF requires OCR support"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        return FileResponse(
+            open(tmp.name, "rb"),
+            as_attachment=True,
+            filename="converted.docx"
+        )
 
-# ➕ Merge
+
+# ==============================
+# ➕ MERGE PDFs
+# ==============================
 class MergePDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         ids = request.data.get("file_ids", [])
+
+        if not isinstance(ids, list) or len(ids) < 2:
+            return Response(
+                {"error": "Select at least two PDF files"},
+                status=400
+            )
+
         files = File.objects.filter(id__in=ids, user=request.user)
 
+        if files.count() < 2:
+            return Response(
+                {"error": "Invalid file selection"},
+                status=400
+            )
+
         tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+        tmp.close()
+
         merge_pdfs([f.file.path for f in files], tmp.name)
-        return FileResponse(open(tmp.name, "rb"), as_attachment=True)
+
+        return FileResponse(
+            open(tmp.name, "rb"),
+            as_attachment=True,
+            filename="merged.pdf"
+        )
 
 
-# ✂ Split
+# ==============================
+# ✂ SPLIT PDF
+# ==============================
 class SplitPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
+
         tmpdir = tempfile.mkdtemp()
         split_pdf(obj.file.path, tmpdir)
 
-        zip_path = os.path.join(tmpdir, "split.zip")
+        zip_path = os.path.join(tmpdir, "split_pages.zip")
+
         with zipfile.ZipFile(zip_path, "w") as z:
-            for f in os.listdir(tmpdir):
-                if f.endswith(".pdf"):
-                    z.write(os.path.join(tmpdir, f), f)
+            for name in sorted(os.listdir(tmpdir)):
+                if name.endswith(".pdf"):
+                    z.write(os.path.join(tmpdir, name), name)
 
-        return FileResponse(open(zip_path, "rb"), as_attachment=True)
+        return FileResponse(
+            open(zip_path, "rb"),
+            as_attachment=True,
+            filename="split_pages.zip"
+        )
 
 
-# ✍ Sign
+# ==============================
+# ✍ SIGN PDF
+# ==============================
 class SignPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
         signer = request.data.get("signer", "Signed User")
         obj = get_object_or_404(File, id=file_id, user=request.user)
-        tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
-        sign_pdf(obj.file.path, tmp.name, signer)
-        return FileResponse(open(tmp.name, "rb"), as_attachment=True)
 
+        tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+        tmp.close()
+
+        sign_pdf(obj.file.path, tmp.name, signer)
+
+        return FileResponse(
+            open(tmp.name, "rb"),
+            as_attachment=True,
+            filename="signed.pdf"
+        )
+
+
+# ==============================
+# 🌍 PUBLIC DOWNLOAD (WHATSAPP)
+# ==============================
 class PublicDownloadView(APIView):
     authentication_classes = []
     permission_classes = []
@@ -176,8 +240,8 @@ class PublicDownloadView(APIView):
     def get(self, request, token):
         obj = get_object_or_404(File, public_token=token)
 
-        if not obj.file:
-            raise Http404
+        if not obj.file or not os.path.exists(obj.file.path):
+            raise Http404("File not found")
 
         return FileResponse(
             obj.file.open("rb"),

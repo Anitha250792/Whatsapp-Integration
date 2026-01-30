@@ -52,7 +52,7 @@ INSTALLED_APPS = [
     # Local apps
     "accounts",
     "files",
-    "pdf_tools",
+    
 ]
 
 # --------------------------------------------------
