@@ -96,8 +96,18 @@ class ShareFileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, file_id):
-        file = UploadedFile.objects.get(id=file_id, user=request.user)
+        obj = get_object_or_404(File, id=file_id, user=request.user)
+
+        public_url = request.build_absolute_uri(
+            f"/api/files/public/{obj.public_token}/"
+        )
 
         return Response({
-            "file_url": request.build_absolute_uri(file.file.url)
+            "filename": obj.filename,
+            "download_url": public_url,
+            "whatsapp_url": (
+                "https://wa.me/?text="
+                f"Download%20file:%20{public_url}"
+            )
         })
+

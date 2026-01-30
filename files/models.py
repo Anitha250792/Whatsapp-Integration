@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 import uuid
 
+public_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 class File(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     file = models.FileField(upload_to="uploads/")
