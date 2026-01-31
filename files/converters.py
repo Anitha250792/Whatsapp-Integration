@@ -38,17 +38,18 @@ def word_to_pdf(docx_path, output_path):
 # PDF ➜ WORD (with OCR fallback)
 # ==============================
 def pdf_to_word(pdf_path, output_path):
-    try:
-        text = extract_text(pdf_path)
-    except Exception:
-        text = ""
+    text = extract_text(pdf_path)
 
-    if text and text.strip():
-        doc = Document()
-        for line in text.split("\n"):
-            doc.add_paragraph(line)
-        doc.save(output_path)
-        return output_path
+    if not text or not text.strip():
+        raise ValueError("This PDF is scanned. OCR not supported yet.")
+
+    doc = Document()
+    for line in text.split("\n"):
+        doc.add_paragraph(line)
+
+    doc.save(output_path)
+    return output_path
+
 
     # OCR fallback
     if not convert_from_path or not pytesseract:
