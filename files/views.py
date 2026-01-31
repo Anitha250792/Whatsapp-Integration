@@ -134,11 +134,12 @@ class PDFToWordView(APIView):
 
         try:
             pdf_to_word(obj.file.path, tmp.name)
-        except ValueError:
-            return Response(
-                {"error": "Scanned PDF requires OCR support"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        except ValueError as e:
+         return Response(
+        {"error": str(e)},
+        status=status.HTTP_400_BAD_REQUEST
+    )
+
 
         return FileResponse(
             open(tmp.name, "rb"),
@@ -185,21 +186,33 @@ class MergePDFView(APIView):
 # ==============================
 # ✂ SPLIT PDF
 # ==============================
+
 class SplitPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
 
+        # Create temp directory
         tmpdir = tempfile.mkdtemp()
-        split_pdf(obj.file.path, tmpdir)
 
+        # Split PDF (returns list of PDF paths)
+        output_files = split_pdf(obj.file.path, tmpdir)
+
+        if not output_files:
+            return Response(
+                {"error": "PDF could not be split"},
+                status=400
+            )
+
+        # Create ZIP file
         zip_path = os.path.join(tmpdir, "split_pages.zip")
-
-        with zipfile.ZipFile(zip_path, "w") as z:
-            for name in sorted(os.listdir(tmpdir)):
-                if name.endswith(".pdf"):
-                    z.write(os.path.join(tmpdir, name), name)
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+            for pdf_path in output_files:
+                z.write(
+                    pdf_path,
+                    arcname=os.path.basename(pdf_path)
+                )
 
         return FileResponse(
             open(zip_path, "rb"),

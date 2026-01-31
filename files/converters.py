@@ -38,52 +38,61 @@ def word_to_pdf(docx_path, output_path):
 # PDF ➜ WORD (with OCR fallback)
 # ==============================
 def pdf_to_word(pdf_path, output_path):
-    text = extract_text(pdf_path) or ""
+    try:
+        text = extract_text(pdf_path)
+    except Exception:
+        text = ""
 
-    # 🧠 If text-based PDF
-    if text.strip():
+    if text and text.strip():
         doc = Document()
         for line in text.split("\n"):
             doc.add_paragraph(line)
         doc.save(output_path)
         return output_path
 
-    # 🖼️ Scanned PDF → OCR required
+    # OCR fallback
     if not convert_from_path or not pytesseract:
-        raise ValueError("Scanned PDFs need OCR support")
+        raise ValueError("OCR dependencies not installed")
 
     images = convert_from_path(pdf_path)
-    ocr_text = ""
+    doc = Document()
 
     for img in images:
-        ocr_text += pytesseract.image_to_string(img)
+        text = pytesseract.image_to_string(img)
+        if text.strip():
+            doc.add_paragraph(text)
 
-    if not ocr_text.strip():
-        raise ValueError("Scanned PDFs need OCR")
-
-    doc = Document()
-    for line in ocr_text.split("\n"):
-        doc.add_paragraph(line)
+    if not doc.paragraphs:
+        raise ValueError("No text found in PDF")
 
     doc.save(output_path)
     return output_path
 
 
+
 # ==============================
 # SIGN PDF
 # ==============================
-def sign_pdf(pdf_path, output_path, signer="Signed by User"):
+def sign_pdf(pdf_path, output_path, signer="Signed User"):
     reader = PdfReader(pdf_path)
     writer = PdfWriter()
 
     for page in reader.pages:
+        packet = io.BytesIO()
+        can = canvas.Canvas(packet, pagesize=A4)
+        can.setFont("Helvetica", 10)
+        can.drawString(40, 40, f"Signed by: {signer}")
+        can.save()
+
+        packet.seek(0)
+        overlay = PdfReader(packet)
+        page.merge_page(overlay.pages[0])
         writer.add_page(page)
 
     with open(output_path, "wb") as f:
         writer.write(f)
 
     return output_path
-
 
 # ==============================
 # MERGE PDFs
@@ -117,3 +126,4 @@ def split_pdf(pdf_path, output_dir):
         output_files.append(out_path)
 
     return output_files
+
