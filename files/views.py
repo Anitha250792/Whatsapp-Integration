@@ -1,6 +1,8 @@
 from django.http import FileResponse, Http404
 from django.core.files import File as DjangoFile
 from django.shortcuts import get_object_or_404
+from django.conf import settings
+
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -10,6 +12,7 @@ from rest_framework.generics import ListAPIView
 
 import tempfile
 import os
+import uuid
 import zipfile
 import mimetypes
 
@@ -57,7 +60,7 @@ class UploadFileView(APIView):
         )
 
         return Response(
-            {"id": obj.id, "filename": obj.filename},
+            FileSerializer(obj, context={"request": request}).data,
             status=201
         )
 
@@ -72,7 +75,7 @@ class DeleteFileView(APIView):
         obj = get_object_or_404(File, id=file_id, user=request.user)
         obj.file.delete(save=False)
         obj.delete()
-        return Response({"message": "Deleted"})
+        return Response({"message": "Deleted"}, status=200)
 
 
 # ==============================
@@ -88,16 +91,12 @@ class DownloadFileView(APIView):
             raise Http404("File not found")
 
         content_type, _ = mimetypes.guess_type(obj.file.path)
-        content_type = content_type or "application/octet-stream"
-
-        response = FileResponse(
+        return FileResponse(
             obj.file.open("rb"),
-            content_type=content_type,
             as_attachment=True,
             filename=obj.filename,
+            content_type=content_type or "application/octet-stream",
         )
-        response["X-Content-Type-Options"] = "nosniff"
-        return response
 
 
 # ==============================
@@ -109,18 +108,35 @@ class WordToPDFView(APIView):
     def post(self, request, file_id):
         original = get_object_or_404(File, id=file_id, user=request.user)
 
-        output_path = original.file.path.replace(".docx", ".pdf")
-        word_to_pdf(original.file.path, output_path)
-
-        with open(output_path, "rb") as f:
-            converted = File.objects.create(
-                user=request.user,
-                file=DjangoFile(f, name=os.path.basename(output_path)),
-                filename=os.path.basename(output_path),
+        if not original.filename.lower().endswith(".docx"):
+            return Response(
+                {"error": "Only .docx files can be converted to PDF"},
+                status=400
             )
 
-        serializer = FileSerializer(converted, context={"request": request})
-        return Response(serializer.data, status=200)
+        try:
+            filename = f"{uuid.uuid4()}.pdf"
+            output_path = os.path.join(settings.MEDIA_ROOT, "uploads", filename)
+
+            word_to_pdf(original.file.path, output_path)
+
+            with open(output_path, "rb") as f:
+                converted = File.objects.create(
+                    user=request.user,
+                    file=DjangoFile(f, name=filename),
+                    filename=filename,
+                )
+
+            return Response(
+                FileSerializer(converted, context={"request": request}).data,
+                status=200
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=500
+            )
 
 
 # ==============================
@@ -132,21 +148,36 @@ class PDFToWordView(APIView):
     def post(self, request, file_id):
         original = get_object_or_404(File, id=file_id, user=request.user)
 
-        output_path = original.file.path.replace(".pdf", ".docx")
-
-        # Convert PDF → Word
-        pdf_to_word(original.file.path, output_path)
-
-        # Save converted file correctly
-        with open(output_path, "rb") as f:
-            converted = File.objects.create(
-                user=request.user,
-                file=DjangoFile(f, name=os.path.basename(output_path)),
-                filename=os.path.basename(output_path),
+        if not original.filename.lower().endswith(".pdf"):
+            return Response(
+                {"error": "Only PDF files can be converted to Word"},
+                status=400
             )
 
-        serializer = FileSerializer(converted, context={"request": request})
-        return Response(serializer.data, status=200)
+        try:
+            filename = f"{uuid.uuid4()}.docx"
+            output_path = os.path.join(settings.MEDIA_ROOT, "uploads", filename)
+
+            pdf_to_word(original.file.path, output_path)
+
+            with open(output_path, "rb") as f:
+                converted = File.objects.create(
+                    user=request.user,
+                    file=DjangoFile(f, name=filename),
+                    filename=filename,
+                )
+
+            return Response(
+                FileSerializer(converted, context={"request": request}).data,
+                status=200
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=500
+            )
+
 
 # ==============================
 # ➕ MERGE PDFs
@@ -186,17 +217,16 @@ class MergePDFView(APIView):
 # ==============================
 # ✂ SPLIT PDF
 # ==============================
-
 class SplitPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
+        if not file_id:
+            return Response({"error": "File ID required"}, status=400)
+
         obj = get_object_or_404(File, id=file_id, user=request.user)
 
-        # Create temp directory
         tmpdir = tempfile.mkdtemp()
-
-        # Split PDF (returns list of PDF paths)
         output_files = split_pdf(obj.file.path, tmpdir)
 
         if not output_files:
@@ -205,14 +235,10 @@ class SplitPDFView(APIView):
                 status=400
             )
 
-        # Create ZIP file
         zip_path = os.path.join(tmpdir, "split_pages.zip")
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        with zipfile.ZipFile(zip_path, "w") as z:
             for pdf_path in output_files:
-                z.write(
-                    pdf_path,
-                    arcname=os.path.basename(pdf_path)
-                )
+                z.write(pdf_path, arcname=os.path.basename(pdf_path))
 
         return FileResponse(
             open(zip_path, "rb"),
@@ -244,7 +270,7 @@ class SignPDFView(APIView):
 
 
 # ==============================
-# 🌍 PUBLIC DOWNLOAD (WHATSAPP)
+# 🌍 PUBLIC DOWNLOAD
 # ==============================
 class PublicDownloadView(APIView):
     authentication_classes = []
