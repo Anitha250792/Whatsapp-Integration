@@ -106,18 +106,20 @@ class WordToPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        obj = get_object_or_404(File, id=file_id, user=request.user)
+        original = get_object_or_404(File, id=file_id, user=request.user)
 
-        tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
-        tmp.close()
+        output_path = original.file.path.replace(".docx", ".pdf")
+        word_to_pdf(original.file.path, output_path)
 
-        word_to_pdf(obj.file.path, tmp.name)
-
-        return FileResponse(
-            open(tmp.name, "rb"),
-            as_attachment=True,
-            filename="converted.pdf"
+        converted = File.objects.create(
+            user=request.user,
+            file=os.path.basename(output_path),
+            filename=os.path.basename(output_path)
         )
+
+        serializer = FileSerializer(converted, context={"request": request})
+        return Response(serializer.data)
+
 
 
 # ==============================
@@ -127,25 +129,20 @@ class PDFToWordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        obj = get_object_or_404(File, id=file_id, user=request.user)
+        original = get_object_or_404(File, id=file_id, user=request.user)
 
-        tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
-        tmp.close()
+        output_path = original.file.path.replace(".pdf", ".docx")
+        pdf_to_word(original.file.path, output_path)
 
-        try:
-            pdf_to_word(obj.file.path, tmp.name)
-        except ValueError as e:
-         return Response(
-        {"error": str(e)},
-        status=status.HTTP_400_BAD_REQUEST
-    )
-
-
-        return FileResponse(
-            open(tmp.name, "rb"),
-            as_attachment=True,
-            filename="converted.docx"
+        converted = File.objects.create(
+            user=request.user,
+            file=os.path.basename(output_path),
+            filename=os.path.basename(output_path)
         )
+
+        serializer = FileSerializer(converted, context={"request": request})
+        return Response(serializer.data)
+
 
 
 # ==============================

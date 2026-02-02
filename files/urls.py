@@ -16,7 +16,8 @@ urlpatterns = [
     path("", FileListView.as_view()),
     path("upload/", UploadFileView.as_view()),
     path("download/<int:file_id>/", DownloadFileView.as_view(), name="file-download"),
-    path("public/<uuid:token>/", PublicDownloadView.as_view()),
+    path("public/<uuid:token>/", PublicDownloadView.as_view(), name="file-public"),
+
     path("delete/<int:file_id>/", DeleteFileView.as_view()),
 
     path("convert/word-to-pdf/<int:file_id>/", WordToPDFView.as_view()),

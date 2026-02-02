@@ -1,10 +1,14 @@
 import os
+import io
+
 from docx import Document
 from pdfminer.high_level import extract_text
 from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+
 from PyPDF2 import PdfMerger, PdfReader, PdfWriter
 
-# OCR (safe imports)
+# OCR (optional dependencies)
 try:
     from pdf2image import convert_from_path
     import pytesseract
@@ -18,57 +22,74 @@ except ImportError:
 # ==============================
 def word_to_pdf(docx_path, output_path):
     doc = Document(docx_path)
-    c = canvas.Canvas(output_path)
 
-    width, height = 595, 842  # A4
-    y = height - 40
+    pdf = SimpleDocTemplate(
+        output_path,
+        pagesize=A4,
+        leftMargin=40,
+        rightMargin=40,
+        topMargin=40,
+        bottomMargin=40,
+    )
+
+    styles = getSampleStyleSheet()
+    normal = styles["Normal"]
+    heading = ParagraphStyle(
+        "Heading",
+        parent=styles["Heading2"],
+        spaceAfter=10,
+    )
+
+    story = []
 
     for para in doc.paragraphs:
-        c.drawString(40, y, para.text)
-        y -= 15
-        if y < 40:
-            c.showPage()
-            y = height - 40
+        text = para.text.strip()
+        if not text:
+            continue
 
-    c.save()
+        if para.style.name.startswith("Heading"):
+            story.append(Paragraph(f"<b>{text}</b>", heading))
+        else:
+            story.append(Paragraph(text, normal))
+
+    pdf.build(story)
     return output_path
 
 
 # ==============================
-# PDF ➜ WORD (with OCR fallback)
+# PDF ➜ WORD
 # ==============================
 def pdf_to_word(pdf_path, output_path):
     text = extract_text(pdf_path)
 
-    if not text or not text.strip():
-        raise ValueError("This PDF is scanned. OCR not supported yet.")
+    # ✅ Normal text-based PDF
+    if text and text.strip():
+        doc = Document()
+        for line in text.split("\n"):
+            if line.strip():
+                doc.add_paragraph(line)
+        doc.save(output_path)
+        return output_path
 
-    doc = Document()
-    for line in text.split("\n"):
-        doc.add_paragraph(line)
-
-    doc.save(output_path)
-    return output_path
-
-
-    # OCR fallback
+    # ❌ Scanned PDF → OCR fallback
     if not convert_from_path or not pytesseract:
-        raise ValueError("OCR dependencies not installed")
+        raise ValueError("Scanned PDF detected. OCR dependencies not installed.")
 
     images = convert_from_path(pdf_path)
     doc = Document()
+    found_text = False
 
     for img in images:
-        text = pytesseract.image_to_string(img)
-        if text.strip():
-            doc.add_paragraph(text)
+        extracted = pytesseract.image_to_string(img)
+        if extracted.strip():
+            doc.add_paragraph(extracted)
+            found_text = True
 
-    if not doc.paragraphs:
-        raise ValueError("No text found in PDF")
+    if not found_text:
+        raise ValueError("No readable text found in scanned PDF.")
 
     doc.save(output_path)
     return output_path
-
 
 
 # ==============================
@@ -82,7 +103,7 @@ def sign_pdf(pdf_path, output_path, signer="Signed User"):
         packet = io.BytesIO()
         can = canvas.Canvas(packet, pagesize=A4)
         can.setFont("Helvetica", 10)
-        can.drawString(40, 40, f"Signed by: {signer}")
+        can.drawString(40, 30, f"Signed by: {signer}")
         can.save()
 
         packet.seek(0)
@@ -94,6 +115,7 @@ def sign_pdf(pdf_path, output_path, signer="Signed User"):
         writer.write(f)
 
     return output_path
+
 
 # ==============================
 # MERGE PDFs
@@ -120,11 +142,10 @@ def split_pdf(pdf_path, output_dir):
         writer = PdfWriter()
         writer.add_page(page)
 
-        out_path = os.path.join(output_dir, f"page_{i+1}.pdf")
+        out_path = os.path.join(output_dir, f"page_{i + 1}.pdf")
         with open(out_path, "wb") as f:
             writer.write(f)
 
         output_files.append(out_path)
 
     return output_files
-
