@@ -7,7 +7,6 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
-from rest_framework import status
 from rest_framework.generics import ListAPIView
 
 import tempfile
@@ -18,13 +17,8 @@ import mimetypes
 
 from .models import File
 from .serializers import FileSerializer
-from .converters import (
-    word_to_pdf,
-    pdf_to_word,
-    merge_pdfs,
-    split_pdf,
-    sign_pdf,
-)
+from .converters import word_to_pdf, pdf_to_word, merge_pdfs, split_pdf, sign_pdf
+
 
 # ==============================
 # 📂 LIST FILES
@@ -49,7 +43,6 @@ class UploadFileView(APIView):
 
     def post(self, request):
         uploaded_file = request.FILES.get("file")
-
         if not uploaded_file:
             return Response({"error": "No file uploaded"}, status=400)
 
@@ -75,7 +68,7 @@ class DeleteFileView(APIView):
         obj = get_object_or_404(File, id=file_id, user=request.user)
         obj.file.delete(save=False)
         obj.delete()
-        return Response({"message": "Deleted"}, status=200)
+        return Response({"message": "Deleted"})
 
 
 # ==============================
@@ -90,12 +83,10 @@ class DownloadFileView(APIView):
         if not obj.file or not os.path.exists(obj.file.path):
             raise Http404("File not found")
 
-        content_type, _ = mimetypes.guess_type(obj.file.path)
         return FileResponse(
             obj.file.open("rb"),
             as_attachment=True,
             filename=obj.filename,
-            content_type=content_type or "application/octet-stream",
         )
 
 
@@ -109,15 +100,12 @@ class WordToPDFView(APIView):
         original = get_object_or_404(File, id=file_id, user=request.user)
 
         if not original.filename.lower().endswith(".docx"):
-            return Response(
-                {"error": "Only .docx files can be converted to PDF"},
-                status=400
-            )
+            return Response({"error": "Only .docx allowed"}, status=400)
+
+        filename = f"{uuid.uuid4()}.pdf"
+        output_path = os.path.join(settings.MEDIA_ROOT, "uploads", filename)
 
         try:
-            filename = f"{uuid.uuid4()}.pdf"
-            output_path = os.path.join(settings.MEDIA_ROOT, "uploads", filename)
-
             word_to_pdf(original.file.path, output_path)
 
             with open(output_path, "rb") as f:
@@ -128,15 +116,12 @@ class WordToPDFView(APIView):
                 )
 
             return Response(
-                FileSerializer(converted, context={"request": request}).data,
-                status=200
+                FileSerializer(converted, context={"request": request}).data
             )
 
         except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=500
-            )
+            print("WORD→PDF ERROR:", e)
+            return Response({"error": str(e)}, status=500)
 
 
 # ==============================
@@ -149,15 +134,12 @@ class PDFToWordView(APIView):
         original = get_object_or_404(File, id=file_id, user=request.user)
 
         if not original.filename.lower().endswith(".pdf"):
-            return Response(
-                {"error": "Only PDF files can be converted to Word"},
-                status=400
-            )
+            return Response({"error": "Only PDF allowed"}, status=400)
+
+        filename = f"{uuid.uuid4()}.docx"
+        output_path = os.path.join(settings.MEDIA_ROOT, "uploads", filename)
 
         try:
-            filename = f"{uuid.uuid4()}.docx"
-            output_path = os.path.join(settings.MEDIA_ROOT, "uploads", filename)
-
             pdf_to_word(original.file.path, output_path)
 
             with open(output_path, "rb") as f:
@@ -168,15 +150,12 @@ class PDFToWordView(APIView):
                 )
 
             return Response(
-                FileSerializer(converted, context={"request": request}).data,
-                status=200
+                FileSerializer(converted, context={"request": request}).data
             )
 
         except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=500
-            )
+            print("PDF→WORD ERROR:", e)
+            return Response({"error": str(e)}, status=500)
 
 
 # ==============================
@@ -187,20 +166,10 @@ class MergePDFView(APIView):
 
     def post(self, request):
         ids = request.data.get("file_ids", [])
-
-        if not isinstance(ids, list) or len(ids) < 2:
-            return Response(
-                {"error": "Select at least two PDF files"},
-                status=400
-            )
+        if len(ids) < 2:
+            return Response({"error": "Select at least 2 PDFs"}, status=400)
 
         files = File.objects.filter(id__in=ids, user=request.user)
-
-        if files.count() < 2:
-            return Response(
-                {"error": "Invalid file selection"},
-                status=400
-            )
 
         tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
         tmp.close()
@@ -210,7 +179,7 @@ class MergePDFView(APIView):
         return FileResponse(
             open(tmp.name, "rb"),
             as_attachment=True,
-            filename="merged.pdf"
+            filename="merged.pdf",
         )
 
 
@@ -221,29 +190,20 @@ class SplitPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        if not file_id:
-            return Response({"error": "File ID required"}, status=400)
-
         obj = get_object_or_404(File, id=file_id, user=request.user)
 
         tmpdir = tempfile.mkdtemp()
         output_files = split_pdf(obj.file.path, tmpdir)
 
-        if not output_files:
-            return Response(
-                {"error": "PDF could not be split"},
-                status=400
-            )
-
         zip_path = os.path.join(tmpdir, "split_pages.zip")
         with zipfile.ZipFile(zip_path, "w") as z:
-            for pdf_path in output_files:
-                z.write(pdf_path, arcname=os.path.basename(pdf_path))
+            for p in output_files:
+                z.write(p, arcname=os.path.basename(p))
 
         return FileResponse(
             open(zip_path, "rb"),
             as_attachment=True,
-            filename="split_pages.zip"
+            filename="split_pages.zip",
         )
 
 
@@ -265,7 +225,7 @@ class SignPDFView(APIView):
         return FileResponse(
             open(tmp.name, "rb"),
             as_attachment=True,
-            filename="signed.pdf"
+            filename="signed.pdf",
         )
 
 
@@ -279,11 +239,8 @@ class PublicDownloadView(APIView):
     def get(self, request, token):
         obj = get_object_or_404(File, public_token=token)
 
-        if not obj.file or not os.path.exists(obj.file.path):
-            raise Http404("File not found")
-
         return FileResponse(
             obj.file.open("rb"),
             as_attachment=True,
-            filename=obj.filename
+            filename=obj.filename,
         )
