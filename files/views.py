@@ -1,4 +1,5 @@
 from django.http import FileResponse, Http404
+from django.core.files import File as DjangoFile
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -111,11 +112,12 @@ class WordToPDFView(APIView):
         output_path = original.file.path.replace(".docx", ".pdf")
         word_to_pdf(original.file.path, output_path)
 
+with open(output_path, "rb") as f:
         converted = File.objects.create(
-            user=request.user,
-            file=os.path.basename(output_path),
-            filename=os.path.basename(output_path)
-        )
+        user=request.user,
+        file=DjangoFile(f, name=os.path.basename(output_path)),
+        filename=os.path.basename(output_path),
+    )
 
         serializer = FileSerializer(converted, context={"request": request})
         return Response(serializer.data)
@@ -132,18 +134,20 @@ class PDFToWordView(APIView):
         original = get_object_or_404(File, id=file_id, user=request.user)
 
         output_path = original.file.path.replace(".pdf", ".docx")
+
+        # Convert PDF → Word
         pdf_to_word(original.file.path, output_path)
 
-        converted = File.objects.create(
-            user=request.user,
-            file=os.path.basename(output_path),
-            filename=os.path.basename(output_path)
-        )
+        # ✅ CORRECT: save file properly
+        with open(output_path, "rb") as f:
+            converted = File.objects.create(
+                user=request.user,
+                file=DjangoFile(f, name=os.path.basename(output_path)),
+                filename=os.path.basename(output_path),
+            )
 
         serializer = FileSerializer(converted, context={"request": request})
-        return Response(serializer.data)
-
-
+        return Response(serializer.data, status=200)
 
 # ==============================
 # ➕ MERGE PDFs
