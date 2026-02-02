@@ -112,16 +112,15 @@ class WordToPDFView(APIView):
         output_path = original.file.path.replace(".docx", ".pdf")
         word_to_pdf(original.file.path, output_path)
 
-with open(output_path, "rb") as f:
-        converted = File.objects.create(
-        user=request.user,
-        file=DjangoFile(f, name=os.path.basename(output_path)),
-        filename=os.path.basename(output_path),
-    )
+        with open(output_path, "rb") as f:
+            converted = File.objects.create(
+                user=request.user,
+                file=DjangoFile(f, name=os.path.basename(output_path)),
+                filename=os.path.basename(output_path),
+            )
 
         serializer = FileSerializer(converted, context={"request": request})
-        return Response(serializer.data)
-
+        return Response(serializer.data, status=200)
 
 
 # ==============================
@@ -138,7 +137,7 @@ class PDFToWordView(APIView):
         # Convert PDF → Word
         pdf_to_word(original.file.path, output_path)
 
-        # ✅ CORRECT: save file properly
+        # Save converted file correctly
         with open(output_path, "rb") as f:
             converted = File.objects.create(
                 user=request.user,
