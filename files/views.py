@@ -8,6 +8,7 @@ from django.http import FileResponse, Http404
 from django.core.files import File as DjangoFile
 from django.shortcuts import get_object_or_404
 from django.conf import settings
+from django.utils import timezone
 
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -28,10 +29,70 @@ from .converters import (
 )
 
 # =====================================================
-# 🔧 GLOBAL UPLOAD DIR (CREATE ONCE)
+# 🔧 GLOBAL UPLOAD DIR
 # =====================================================
 UPLOAD_DIR = os.path.join(settings.MEDIA_ROOT, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+# =====================================================
+# 🔔 WHATSAPP SAFETY
+# =====================================================
+def enforce_whatsapp_rules(request):
+    profile = getattr(request.user, "userprofile", None)
+
+    if not profile:
+        return Response({"error": "Profile not found"}, status=400)
+
+    if not profile.whatsapp_enabled:
+        return Response({"error": "WhatsApp delivery disabled"}, status=400)
+
+    if not profile.whatsapp_number:
+        return Response(
+            {"error": "Please add WhatsApp number in dashboard"},
+            status=400
+        )
+
+    today = timezone.now().date()
+    if profile.last_whatsapp_date != today:
+        profile.daily_whatsapp_count = 0
+        profile.last_whatsapp_date = today
+        profile.save()
+
+    if profile.daily_whatsapp_count >= 5:
+        return Response(
+            {"error": "Daily WhatsApp limit reached"},
+            status=429
+        )
+
+    return None
+
+
+def mark_whatsapp_sent(profile):
+    profile.daily_whatsapp_count += 1
+    profile.save()
+
+
+def safe_get_profile(user):
+    return getattr(user, "userprofile", None)
+
+
+class WhatsAppMixin:
+    def send_whatsapp(self, request, file_obj, title):
+        profile = safe_get_profile(request.user)
+        if not profile or not profile.whatsapp_number:
+            return
+
+        public_url = request.build_absolute_uri(
+            f"/files/public/{file_obj.public_token}/"
+        )
+
+        send_whatsapp_message(
+            profile.whatsapp_number,
+            f"{title}\n{public_url}",
+        )
+
+        mark_whatsapp_sent(profile)
 
 
 # =====================================================
@@ -86,7 +147,7 @@ class DeleteFileView(APIView):
 
 
 # =====================================================
-# ⬇ DOWNLOAD (AUTH)
+# ⬇ DOWNLOAD
 # =====================================================
 class DownloadFileView(APIView):
     permission_classes = [IsAuthenticated]
@@ -94,7 +155,7 @@ class DownloadFileView(APIView):
     def get(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
 
-        if not obj.file or not os.path.exists(obj.file.path):
+        if not os.path.exists(obj.file.path):
             raise Http404("File not found")
 
         return FileResponse(
@@ -107,14 +168,15 @@ class DownloadFileView(APIView):
 # =====================================================
 # 🔁 WORD → PDF
 # =====================================================
-class WordToPDFView(APIView):
+class WordToPDFView(APIView, WhatsAppMixin):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        original = get_object_or_404(File, id=file_id, user=request.user)
+        error = enforce_whatsapp_rules(request)
+        if error:
+            return error
 
-        if not original.filename.lower().endswith(".docx"):
-            return Response({"error": "Only .docx files allowed"}, status=400)
+        original = get_object_or_404(File, id=file_id, user=request.user)
 
         filename = f"{uuid.uuid4()}.pdf"
         output_path = os.path.join(UPLOAD_DIR, filename)
@@ -139,14 +201,15 @@ class WordToPDFView(APIView):
 # =====================================================
 # 🔁 PDF → WORD
 # =====================================================
-class PDFToWordView(APIView):
+class PDFToWordView(APIView, WhatsAppMixin):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        original = get_object_or_404(File, id=file_id, user=request.user)
+        error = enforce_whatsapp_rules(request)
+        if error:
+            return error
 
-        if not original.filename.lower().endswith(".pdf"):
-            return Response({"error": "Only PDF files allowed"}, status=400)
+        original = get_object_or_404(File, id=file_id, user=request.user)
 
         filename = f"{uuid.uuid4()}.docx"
         output_path = os.path.join(UPLOAD_DIR, filename)
@@ -171,15 +234,15 @@ class PDFToWordView(APIView):
 # =====================================================
 # ➕ MERGE PDFs
 # =====================================================
-class MergePDFView(APIView):
+class MergePDFView(APIView, WhatsAppMixin):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        error = enforce_whatsapp_rules(request)
+        if error:
+            return error
+
         ids = request.data.get("file_ids", [])
-
-        if not isinstance(ids, list) or len(ids) < 2:
-            return Response({"error": "Select at least 2 PDFs"}, status=400)
-
         files = File.objects.filter(id__in=ids, user=request.user)
 
         filename = f"{uuid.uuid4()}.pdf"
@@ -205,10 +268,14 @@ class MergePDFView(APIView):
 # =====================================================
 # ✂ SPLIT PDF
 # =====================================================
-class SplitPDFView(APIView):
+class SplitPDFView(APIView, WhatsAppMixin):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
+        error = enforce_whatsapp_rules(request)
+        if error:
+            return error
+
         obj = get_object_or_404(File, id=file_id, user=request.user)
 
         tmpdir = tempfile.mkdtemp()
@@ -218,7 +285,7 @@ class SplitPDFView(APIView):
             zip_name = f"{uuid.uuid4()}.zip"
             zip_path = os.path.join(UPLOAD_DIR, zip_name)
 
-            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+            with zipfile.ZipFile(zip_path, "w") as z:
                 for p in output_files:
                     z.write(p, arcname=os.path.basename(p))
 
@@ -242,12 +309,16 @@ class SplitPDFView(APIView):
 # =====================================================
 # ✍ SIGN PDF
 # =====================================================
-class SignPDFView(APIView):
+class SignPDFView(APIView, WhatsAppMixin):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        signer = request.data.get("signer", "Signed User")
+        error = enforce_whatsapp_rules(request)
+        if error:
+            return error
+
         obj = get_object_or_404(File, id=file_id, user=request.user)
+        signer = request.data.get("signer", "Signed User")
 
         filename = f"{uuid.uuid4()}.pdf"
         output_path = os.path.join(UPLOAD_DIR, filename)
@@ -278,42 +349,8 @@ class PublicDownloadView(APIView):
 
     def get(self, request, token):
         obj = get_object_or_404(File, public_token=token)
-
-        if not obj.file or not os.path.exists(obj.file.path):
-            raise Http404("File not found")
-
         return FileResponse(
             obj.file.open("rb"),
             as_attachment=True,
             filename=obj.filename,
         )
-
-
-# =====================================================
-# 🔔 WHATSAPP HELPER (SAFE)
-# =====================================================
-def safe_get_profile(user):
-    return getattr(user, "userprofile", None)
-
-
-class WhatsAppMixin:
-    def send_whatsapp(self, request, file_obj, title):
-        profile = safe_get_profile(request.user)
-        if not profile or not profile.whatsapp_number:
-            return
-
-        public_url = request.build_absolute_uri(
-            f"/files/public/{file_obj.public_token}/"
-        )
-        send_whatsapp_message(
-            profile.whatsapp_number,
-            f"{title}\n{public_url}",
-        )
-
-
-# Inject mixin
-WordToPDFView.send_whatsapp = WhatsAppMixin.send_whatsapp
-PDFToWordView.send_whatsapp = WhatsAppMixin.send_whatsapp
-MergePDFView.send_whatsapp = WhatsAppMixin.send_whatsapp
-SplitPDFView.send_whatsapp = WhatsAppMixin.send_whatsapp
-SignPDFView.send_whatsapp = WhatsAppMixin.send_whatsapp
