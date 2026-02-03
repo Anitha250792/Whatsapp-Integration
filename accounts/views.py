@@ -9,6 +9,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from django.conf import settings
 from django.http import HttpResponse
+from .models import UserProfile
 import requests
 
 User = get_user_model()
@@ -133,3 +134,31 @@ class UpdateWhatsappView(APIView):
             "whatsapp_number": profile.whatsapp_number,
             "enabled": profile.whatsapp_enabled
         })
+    
+class UpdateWhatsAppView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        whatsapp_number = request.data.get("whatsapp_number")
+
+        if not whatsapp_number:
+            return Response(
+                {"error": "WhatsApp number is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile, _ = UserProfile.objects.get_or_create(
+            user=request.user
+        )
+
+        profile.whatsapp_number = whatsapp_number
+        profile.whatsapp_enabled = True
+        profile.save()
+
+        return Response(
+            {
+                "message": "WhatsApp number saved successfully",
+                "whatsapp_number": whatsapp_number,
+            },
+            status=status.HTTP_200_OK,
+        )    
