@@ -29,10 +29,13 @@ from .converters import (
 )
 
 # =====================================================
-# 🔧 GLOBAL UPLOAD DIR
+# ⚙ CONFIG
 # =====================================================
 UPLOAD_DIR = os.path.join(settings.MEDIA_ROOT, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+MAX_FILE_MB = 10
+MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
 
 
 # =====================================================
@@ -50,7 +53,7 @@ def enforce_whatsapp_rules(request):
     if not profile.whatsapp_number:
         return Response(
             {"error": "Please add WhatsApp number in dashboard"},
-            status=400
+            status=400,
         )
 
     today = timezone.now().date()
@@ -62,7 +65,7 @@ def enforce_whatsapp_rules(request):
     if profile.daily_whatsapp_count >= 5:
         return Response(
             {"error": "Daily WhatsApp limit reached"},
-            status=429
+            status=429,
         )
 
     return None
@@ -70,7 +73,7 @@ def enforce_whatsapp_rules(request):
 
 def mark_whatsapp_sent(profile):
     profile.daily_whatsapp_count += 1
-    profile.save()
+    profile.save(update_fields=["daily_whatsapp_count"])
 
 
 def safe_get_profile(user):
@@ -118,8 +121,15 @@ class UploadFileView(APIView):
 
     def post(self, request):
         uploaded_file = request.FILES.get("file")
+
         if not uploaded_file:
             return Response({"error": "No file uploaded"}, status=400)
+
+        if uploaded_file.size > MAX_FILE_BYTES:
+            return Response(
+                {"error": f"File too large. Max {MAX_FILE_MB}MB allowed"},
+                status=400,
+            )
 
         obj = File.objects.create(
             user=request.user,
@@ -155,7 +165,7 @@ class DownloadFileView(APIView):
     def get(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
 
-        if not os.path.exists(obj.file.path):
+        if not obj.file or not os.path.exists(obj.file.path):
             raise Http404("File not found")
 
         return FileResponse(
@@ -178,24 +188,33 @@ class WordToPDFView(APIView, WhatsAppMixin):
 
         original = get_object_or_404(File, id=file_id, user=request.user)
 
-        filename = f"{uuid.uuid4()}.pdf"
-        output_path = os.path.join(UPLOAD_DIR, filename)
+        try:
+            filename = f"{uuid.uuid4()}.pdf"
+            output_path = os.path.join(UPLOAD_DIR, filename)
 
-        word_to_pdf(original.file.path, output_path)
+            word_to_pdf(original.file.path, output_path)
 
-        with open(output_path, "rb") as f:
-            converted = File.objects.create(
-                user=request.user,
-                file=DjangoFile(f, name=filename),
-                filename=filename,
+            with open(output_path, "rb") as f:
+                converted = File.objects.create(
+                    user=request.user,
+                    file=DjangoFile(f, name=filename),
+                    filename=filename,
+                )
+
+            self.send_whatsapp(
+                request, converted, "📄 Your converted PDF is ready:"
             )
 
-        self.send_whatsapp(request, converted, "📄 Your converted PDF is ready:")
+            return Response(
+                FileSerializer(converted, context={"request": request}).data,
+                status=201,
+            )
 
-        return Response(
-            FileSerializer(converted, context={"request": request}).data,
-            status=201,
-        )
+        except Exception:
+            return Response(
+                {"error": "Word → PDF failed. File may be unsupported."},
+                status=400,
+            )
 
 
 # =====================================================
@@ -211,24 +230,39 @@ class PDFToWordView(APIView, WhatsAppMixin):
 
         original = get_object_or_404(File, id=file_id, user=request.user)
 
-        filename = f"{uuid.uuid4()}.docx"
-        output_path = os.path.join(UPLOAD_DIR, filename)
-
-        pdf_to_word(original.file.path, output_path)
-
-        with open(output_path, "rb") as f:
-            converted = File.objects.create(
-                user=request.user,
-                file=DjangoFile(f, name=filename),
-                filename=filename,
+        if original.file.size > MAX_FILE_BYTES:
+            return Response(
+                {"error": "PDF too large for free tier conversion"},
+                status=400,
             )
 
-        self.send_whatsapp(request, converted, "📄 Your converted Word file is ready:")
+        try:
+            filename = f"{uuid.uuid4()}.docx"
+            output_path = os.path.join(UPLOAD_DIR, filename)
 
-        return Response(
-            FileSerializer(converted, context={"request": request}).data,
-            status=201,
-        )
+            pdf_to_word(original.file.path, output_path)
+
+            with open(output_path, "rb") as f:
+                converted = File.objects.create(
+                    user=request.user,
+                    file=DjangoFile(f, name=filename),
+                    filename=filename,
+                )
+
+            self.send_whatsapp(
+                request, converted, "📄 Your converted Word file is ready:"
+            )
+
+            return Response(
+                FileSerializer(converted, context={"request": request}).data,
+                status=201,
+            )
+
+        except Exception:
+            return Response(
+                {"error": "PDF too complex to convert on free tier"},
+                status=400,
+            )
 
 
 # =====================================================
@@ -245,24 +279,39 @@ class MergePDFView(APIView, WhatsAppMixin):
         ids = request.data.get("file_ids", [])
         files = File.objects.filter(id__in=ids, user=request.user)
 
-        filename = f"{uuid.uuid4()}.pdf"
-        output_path = os.path.join(UPLOAD_DIR, filename)
-
-        merge_pdfs([f.file.path for f in files], output_path)
-
-        with open(output_path, "rb") as f:
-            merged = File.objects.create(
-                user=request.user,
-                file=DjangoFile(f, name=filename),
-                filename=filename,
+        if files.count() < 2:
+            return Response(
+                {"error": "Select at least 2 PDF files"},
+                status=400,
             )
 
-        self.send_whatsapp(request, merged, "📄 Your merged PDF is ready:")
+        try:
+            filename = f"{uuid.uuid4()}.pdf"
+            output_path = os.path.join(UPLOAD_DIR, filename)
 
-        return Response(
-            FileSerializer(merged, context={"request": request}).data,
-            status=201,
-        )
+            merge_pdfs([f.file.path for f in files], output_path)
+
+            with open(output_path, "rb") as f:
+                merged = File.objects.create(
+                    user=request.user,
+                    file=DjangoFile(f, name=filename),
+                    filename=filename,
+                )
+
+            self.send_whatsapp(
+                request, merged, "📄 Your merged PDF is ready:"
+            )
+
+            return Response(
+                FileSerializer(merged, context={"request": request}).data,
+                status=201,
+            )
+
+        except Exception:
+            return Response(
+                {"error": "PDF merge failed. Files may be incompatible."},
+                status=400,
+            )
 
 
 # =====================================================
@@ -296,18 +345,27 @@ class SplitPDFView(APIView, WhatsAppMixin):
                     filename="split_pages.zip",
                 )
 
-            self.send_whatsapp(request, zip_file, "📦 Your split PDF files are ready:")
+            self.send_whatsapp(
+                request, zip_file, "📦 Your split PDF files are ready:"
+            )
 
             return Response(
                 FileSerializer(zip_file, context={"request": request}).data,
                 status=201,
             )
+
+        except Exception:
+            return Response(
+                {"error": "PDF split failed"},
+                status=400,
+            )
+
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 # =====================================================
-# ✍ SIGN PDF
+# ✍ SIGN PDF (SAFE VERSION)
 # =====================================================
 class SignPDFView(APIView, WhatsAppMixin):
     permission_classes = [IsAuthenticated]
@@ -320,24 +378,33 @@ class SignPDFView(APIView, WhatsAppMixin):
         obj = get_object_or_404(File, id=file_id, user=request.user)
         signer = request.data.get("signer", "Signed User")
 
-        filename = f"{uuid.uuid4()}.pdf"
-        output_path = os.path.join(UPLOAD_DIR, filename)
+        try:
+            filename = f"{uuid.uuid4()}.pdf"
+            output_path = os.path.join(UPLOAD_DIR, filename)
 
-        sign_pdf(obj.file.path, output_path, signer)
+            sign_pdf(obj.file.path, output_path, signer)
 
-        with open(output_path, "rb") as f:
-            signed = File.objects.create(
-                user=request.user,
-                file=DjangoFile(f, name=filename),
-                filename=filename,
+            with open(output_path, "rb") as f:
+                signed = File.objects.create(
+                    user=request.user,
+                    file=DjangoFile(f, name=filename),
+                    filename=filename,
+                )
+
+            self.send_whatsapp(
+                request, signed, "✍ Your signed PDF is ready:"
             )
 
-        self.send_whatsapp(request, signed, "✍ Your signed PDF is ready:")
+            return Response(
+                FileSerializer(signed, context={"request": request}).data,
+                status=201,
+            )
 
-        return Response(
-            FileSerializer(signed, context={"request": request}).data,
-            status=201,
-        )
+        except Exception:
+            return Response(
+                {"error": "PDF signing failed. Unsupported PDF format."},
+                status=400,
+            )
 
 
 # =====================================================
@@ -349,6 +416,10 @@ class PublicDownloadView(APIView):
 
     def get(self, request, token):
         obj = get_object_or_404(File, public_token=token)
+
+        if not obj.file or not os.path.exists(obj.file.path):
+            raise Http404("File not found")
+
         return FileResponse(
             obj.file.open("rb"),
             as_attachment=True,

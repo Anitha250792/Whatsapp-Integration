@@ -19,7 +19,9 @@ DEBUG = False
 
 ALLOWED_HOSTS = [
     "whatsapp-integration-u7tq.onrender.com",
+    ".onrender.com",
 ]
+
 
 
 # --------------------------------------------------
@@ -61,13 +63,16 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    
+    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-] 
+]
+ 
 
 # --------------------------------------------------
 # AUTH / ALLAUTH CONFIG
@@ -260,4 +265,4 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024      # 50 MB
 # --------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-POPPLER_PATH = r"C:\poppler\Library\bin"
+
