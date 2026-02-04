@@ -213,18 +213,16 @@ class MergePDFView(APIView):
 
         output_path = os.path.join(UPLOAD_DIR, "merged.pdf")
 
-        try:
-            merge_pdfs([f.file.path for f in files], output_path)
-        except Exception:
-            return Response({"error": "Merge failed"}, status=400)
+        merge_pdfs([f.file.path for f in files], output_path)
 
-        return FileResponse(
+        response = FileResponse(
             open(output_path, "rb"),
             as_attachment=True,
             filename="merged.pdf",
             content_type="application/pdf",
         )
-
+        response["Content-Length"] = os.path.getsize(output_path)
+        return response
 
 
 # =====================================================
@@ -238,19 +236,21 @@ class SplitPDFView(APIView):
         tmpdir = tempfile.mkdtemp()
 
         try:
-            output_files = split_pdf(obj.file.path, tmpdir)
-
+            pages = split_pdf(obj.file.path, tmpdir)
             zip_path = os.path.join(UPLOAD_DIR, "split_pages.zip")
+
             with zipfile.ZipFile(zip_path, "w") as z:
-                for p in output_files:
+                for p in pages:
                     z.write(p, arcname=os.path.basename(p))
 
-            return FileResponse(
+            response = FileResponse(
                 open(zip_path, "rb"),
                 as_attachment=True,
                 filename="split_pages.zip",
                 content_type="application/zip",
             )
+            response["Content-Length"] = os.path.getsize(zip_path)
+            return response
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
