@@ -6,7 +6,7 @@ IMPORTANT ARCHITECTURE NOTE
 Render free services do NOT support:
 - LibreOffice
 - Poppler
-- Long-running CPU-heavy jobs
+- OCR / heavy CPU jobs
 
 Therefore:
 - DOCX → PDF
@@ -14,12 +14,12 @@ Therefore:
 
 are intentionally DISABLED in web requests.
 
-These functions are designed to be executed via:
-✔ Celery
-✔ Background worker
+These functions are designed for:
+✔ Celery workers
+✔ Background jobs
 ✔ Dedicated conversion microservice
 
-This avoids 500 errors and keeps the API stable.
+This keeps the API stable and avoids 500 errors.
 """
 
 import os
@@ -37,15 +37,11 @@ def word_to_pdf(docx_path, output_path):
     """
     DOCX → PDF conversion
 
-    ❌ Disabled on Render Web Service
-    ✅ Intended for Celery background worker
+    ❌ Disabled on web
+    ✅ Intended for Celery
 
-    Celery usage example:
+    Example:
         word_to_pdf.delay(docx_path, output_path)
-
-    Reason:
-    - Requires LibreOffice
-    - High memory usage
     """
     raise RuntimeError(
         "Word to PDF conversion runs asynchronously (background worker)"
@@ -59,15 +55,8 @@ def pdf_to_word(pdf_path, output_path):
     """
     PDF → DOCX conversion
 
-    ❌ Disabled on Render Web Service
-    ✅ Intended for Celery background worker
-
-    Celery usage example:
-        pdf_to_word.delay(pdf_path, output_path)
-
-    Reason:
-    - OCR / pdfminer heavy
-    - Not safe on free hosting
+    ❌ Disabled on web
+    ✅ Intended for Celery
     """
     raise RuntimeError(
         "PDF to Word conversion runs asynchronously (background worker)"
@@ -75,16 +64,9 @@ def pdf_to_word(pdf_path, output_path):
 
 
 # =====================================================
-# ✍ SIGN PDF (SAFE FOR WEB)
+# ✍ SIGN PDF (SAFE)
 # =====================================================
 def sign_pdf(pdf_path, output_path, signer="Signed User"):
-    """
-    Digitally stamps a PDF with signer name.
-
-    ✔ Lightweight
-    ✔ Safe on Render
-    ✔ No external binaries
-    """
     reader = PdfReader(pdf_path)
     writer = PdfWriter()
 
@@ -98,8 +80,8 @@ def sign_pdf(pdf_path, output_path, signer="Signed User"):
 
         packet.seek(0)
         overlay = PdfReader(packet)
-
         page.merge_page(overlay.pages[0])
+
         writer.add_page(page)
 
     with open(output_path, "wb") as f:
@@ -109,38 +91,21 @@ def sign_pdf(pdf_path, output_path, signer="Signed User"):
 
 
 # =====================================================
-# ➕ MERGE PDFs (SAFE FOR WEB)
+# ➕ MERGE PDFs (SAFE)
 # =====================================================
 def merge_pdfs(pdf_paths, output_path):
-    """
-    Merge multiple PDFs into one.
-
-    ✔ Safe
-    ✔ Fast
-    ✔ No system dependencies
-    """
     merger = PdfMerger()
-
     for path in pdf_paths:
         merger.append(path)
-
     merger.write(output_path)
     merger.close()
-
     return output_path
 
 
 # =====================================================
-# ✂ SPLIT PDF (SAFE FOR WEB)
+# ✂ SPLIT PDF (SAFE)
 # =====================================================
 def split_pdf(pdf_path, output_dir):
-    """
-    Split a PDF into individual pages.
-
-    ✔ Safe
-    ✔ Uses temp directory
-    ✔ Returns list of output files
-    """
     reader = PdfReader(pdf_path)
     output_files = []
 
