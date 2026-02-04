@@ -13,5 +13,5 @@ class FileSerializer(serializers.ModelSerializer):
     def get_public_url(self, obj):
         request = self.context.get("request")
         return request.build_absolute_uri(
-            reverse("file-public", args=[obj.public_token])
+            f"/files/public/{obj.public_token}/"
         )

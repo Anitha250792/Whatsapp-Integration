@@ -270,8 +270,11 @@ class SignPDFView(APIView):
 
         try:
             sign_pdf(obj.file.path, output_path, signer)
-        except Exception:
-            return Response({"error": "PDF signing failed"}, status=400)
+        except RuntimeError as e:
+            return Response(
+        {"error": str(e)},
+        status=503
+    )
 
         return FileResponse(
             open(output_path, "rb"),

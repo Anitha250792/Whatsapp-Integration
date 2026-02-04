@@ -67,27 +67,12 @@ def pdf_to_word(pdf_path, output_path):
 # ✍ SIGN PDF (SAFE)
 # =====================================================
 def sign_pdf(pdf_path, output_path, signer="Signed User"):
-    reader = PdfReader(pdf_path)
-    writer = PdfWriter()
+    """
+    PDF signing is heavy and unsafe on Render web dynos.
+    Must be processed asynchronously (Celery worker).
+    """
+    raise RuntimeError("PDF signing is processed asynchronously")
 
-    for page in reader.pages:
-        packet = io.BytesIO()
-
-        c = canvas.Canvas(packet, pagesize=A4)
-        c.setFont("Helvetica", 9)
-        c.drawString(40, 25, f"Signed by: {signer}")
-        c.save()
-
-        packet.seek(0)
-        overlay = PdfReader(packet)
-        page.merge_page(overlay.pages[0])
-
-        writer.add_page(page)
-
-    with open(output_path, "wb") as f:
-        writer.write(f)
-
-    return output_path
 
 
 # =====================================================
