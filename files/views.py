@@ -42,19 +42,21 @@ MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
 # 🔔 WHATSAPP SAFETY
 # =====================================================
 def enforce_whatsapp_rules(request):
+    """
+    WhatsApp is OPTIONAL.
+    This function only decides whether WhatsApp can be sent.
+    It MUST NOT block file operations.
+    """
     profile = getattr(request.user, "userprofile", None)
 
     if not profile:
-        return Response({"error": "Profile not found"}, status=400)
+        return False  # allow conversion
 
     if not profile.whatsapp_enabled:
-        return Response({"error": "WhatsApp delivery disabled"}, status=400)
+        return False
 
     if not profile.whatsapp_number:
-        return Response(
-            {"error": "Please add WhatsApp number in dashboard"},
-            status=400,
-        )
+        return False
 
     today = timezone.now().date()
     if profile.last_whatsapp_date != today:
@@ -63,12 +65,9 @@ def enforce_whatsapp_rules(request):
         profile.save()
 
     if profile.daily_whatsapp_count >= 5:
-        return Response(
-            {"error": "Daily WhatsApp limit reached"},
-            status=429,
-        )
+        return False
 
-    return None
+    return True
 
 
 def mark_whatsapp_sent(profile):
@@ -83,8 +82,10 @@ def safe_get_profile(user):
 class WhatsAppMixin:
     def send_whatsapp(self, request, file_obj, title):
         profile = safe_get_profile(request.user)
-        if not profile or not profile.whatsapp_number:
+
+        if not enforce_whatsapp_rules(request):
             return
+ 
 
         public_url = request.build_absolute_uri(
             f"/files/public/{file_obj.public_token}/"
