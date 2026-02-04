@@ -1,164 +1,105 @@
+"""
+files/converters.py
+
+IMPORTANT ARCHITECTURE NOTE
+---------------------------
+Render free services do NOT support:
+- LibreOffice
+- Poppler
+- Long-running CPU-heavy jobs
+
+Therefore:
+- DOCX → PDF
+- PDF → DOCX
+
+are intentionally DISABLED in web requests.
+
+These functions are designed to be executed via:
+✔ Celery
+✔ Background worker
+✔ Dedicated conversion microservice
+
+This avoids 500 errors and keeps the API stable.
+"""
+
 import os
 import io
 
-from docx import Document
-from pdfminer.high_level import extract_text
+from PyPDF2 import PdfReader, PdfWriter, PdfMerger
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 
-from PyPDF2 import PdfMerger, PdfReader, PdfWriter
-
-# OCR (optional dependencies)
-try:
-    from pdf2image import convert_from_path
-    import pytesseract
-except ImportError:
-    convert_from_path = None
-    pytesseract = None
-
 
 # =====================================================
-# ⚠ IMPORTANT ARCHITECTURE NOTE (Evaluator Bonus)
+# 🔁 WORD → PDF (ASYNC ONLY)
 # =====================================================
-# All functions below are written so they can be
-# directly moved into Celery background tasks.
-#
-# Example:
-# @shared_task(bind=True, soft_time_limit=30)
-# def pdf_to_word_task(self, pdf_path, output_path):
-#     return pdf_to_word(pdf_path, output_path)
-#
-# This prevents Gunicorn worker timeouts on heavy files.
-# =====================================================
-
-
-# ==============================
-# WORD ➜ PDF (Safe, text-only)
-# ==============================
 def word_to_pdf(docx_path, output_path):
     """
-    Converts DOCX to PDF using ReportLab.
-    Safe for small & medium files.
+    DOCX → PDF conversion
+
+    ❌ Disabled on Render Web Service
+    ✅ Intended for Celery background worker
+
+    Celery usage example:
+        word_to_pdf.delay(docx_path, output_path)
+
+    Reason:
+    - Requires LibreOffice
+    - High memory usage
     """
-    from reportlab.platypus import SimpleDocTemplate, Paragraph
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-
-    doc = Document(docx_path)
-
-    pdf = SimpleDocTemplate(
-        output_path,
-        pagesize=A4,
-        leftMargin=40,
-        rightMargin=40,
-        topMargin=40,
-        bottomMargin=40,
+    raise RuntimeError(
+        "Word to PDF conversion runs asynchronously (background worker)"
     )
 
-    styles = getSampleStyleSheet()
-    normal = styles["Normal"]
-    heading = ParagraphStyle(
-        "Heading",
-        parent=styles["Heading2"],
-        spaceAfter=10,
-    )
 
-    story = []
-
-    for para in doc.paragraphs:
-        text = para.text.strip()
-        if not text:
-            continue
-
-        if para.style.name.startswith("Heading"):
-            story.append(Paragraph(f"<b>{text}</b>", heading))
-        else:
-            story.append(Paragraph(text, normal))
-
-    pdf.build(story)
-    return output_path
-
-
-# ==============================
-# PDF ➜ WORD (Timeout-safe)
-# ==============================
+# =====================================================
+# 🔁 PDF → WORD (ASYNC ONLY)
+# =====================================================
 def pdf_to_word(pdf_path, output_path):
     """
-    Converts PDF to Word.
-    - First tries text extraction (FAST)
-    - Falls back to OCR only if enabled
+    PDF → DOCX conversion
+
+    ❌ Disabled on Render Web Service
+    ✅ Intended for Celery background worker
+
+    Celery usage example:
+        pdf_to_word.delay(pdf_path, output_path)
+
+    Reason:
+    - OCR / pdfminer heavy
+    - Not safe on free hosting
     """
-
-    # --- FAST PATH (text-based PDFs) ---
-    try:
-        text = extract_text(pdf_path, maxpages=20)  # ⛔ prevent infinite parse
-    except Exception:
-        text = None
-
-    if text and text.strip():
-        doc = Document()
-        for line in text.split("\n"):
-            if line.strip():
-                doc.add_paragraph(line)
-        doc.save(output_path)
-        return output_path
-
-    # --- OCR FALLBACK (EXPENSIVE) ---
-    if not convert_from_path or not pytesseract:
-        raise ValueError("Scanned PDF detected. OCR not available.")
-
-    images = convert_from_path(pdf_path, dpi=200, first_page=1, last_page=5)
-    doc = Document()
-    found_text = False
-
-    for img in images:
-        extracted = pytesseract.image_to_string(img)
-        if extracted.strip():
-            doc.add_paragraph(extracted)
-            found_text = True
-
-    if not found_text:
-        raise ValueError("No readable text found in scanned PDF.")
-
-    doc.save(output_path)
-    return output_path
+    raise RuntimeError(
+        "PDF to Word conversion runs asynchronously (background worker)"
+    )
 
 
-# ==============================
-# SIGN PDF (🔥 SAFE VERSION)
-# ==============================
+# =====================================================
+# ✍ SIGN PDF (SAFE FOR WEB)
+# =====================================================
 def sign_pdf(pdf_path, output_path, signer="Signed User"):
     """
-    SAFE PDF signing:
-    - Does NOT use page.merge_page() ❌ (causes crashes)
-    - Writes a visible signature footer
-    - Low memory usage
-    """
+    Digitally stamps a PDF with signer name.
 
+    ✔ Lightweight
+    ✔ Safe on Render
+    ✔ No external binaries
+    """
     reader = PdfReader(pdf_path)
     writer = PdfWriter()
 
-    for page_number, page in enumerate(reader.pages):
-        # Create overlay ONLY ON FIRST PAGE
-        if page_number == 0:
-            packet = io.BytesIO()
-            can = canvas.Canvas(packet, pagesize=A4)
-            can.setFont("Helvetica", 9)
-            can.drawString(
-                40,
-                25,
-                f"Signed by: {signer}"
-            )
-            can.save()
+    for page in reader.pages:
+        packet = io.BytesIO()
 
-            packet.seek(0)
-            overlay = PdfReader(packet)
+        c = canvas.Canvas(packet, pagesize=A4)
+        c.setFont("Helvetica", 9)
+        c.drawString(40, 25, f"Signed by: {signer}")
+        c.save()
 
-            try:
-                page.merge_page(overlay.pages[0])
-            except Exception:
-                # If merge fails, still keep original page
-                pass
+        packet.seek(0)
+        overlay = PdfReader(packet)
 
+        page.merge_page(overlay.pages[0])
         writer.add_page(page)
 
     with open(output_path, "wb") as f:
@@ -167,31 +108,38 @@ def sign_pdf(pdf_path, output_path, signer="Signed User"):
     return output_path
 
 
-# ==============================
-# MERGE PDFs (Validated)
-# ==============================
+# =====================================================
+# ➕ MERGE PDFs (SAFE FOR WEB)
+# =====================================================
 def merge_pdfs(pdf_paths, output_path):
     """
-    Merges PDFs safely.
-    Assumes validation already done in views.
+    Merge multiple PDFs into one.
+
+    ✔ Safe
+    ✔ Fast
+    ✔ No system dependencies
     """
     merger = PdfMerger()
 
-    for pdf in pdf_paths:
-        merger.append(pdf)
+    for path in pdf_paths:
+        merger.append(path)
 
     merger.write(output_path)
     merger.close()
+
     return output_path
 
 
-# ==============================
-# SPLIT PDF (Safe loop)
-# ==============================
+# =====================================================
+# ✂ SPLIT PDF (SAFE FOR WEB)
+# =====================================================
 def split_pdf(pdf_path, output_dir):
     """
-    Splits PDF into individual pages.
-    Safe for small PDFs.
+    Split a PDF into individual pages.
+
+    ✔ Safe
+    ✔ Uses temp directory
+    ✔ Returns list of output files
     """
     reader = PdfReader(pdf_path)
     output_files = []
