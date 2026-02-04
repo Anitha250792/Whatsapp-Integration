@@ -201,7 +201,7 @@ class PDFToWordView(APIView, WhatsAppMixin):
 # =====================================================
 # ➕ MERGE PDFs
 # =====================================================
-class MergePDFView(APIView, WhatsAppMixin):
+class MergePDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -211,66 +211,45 @@ class MergePDFView(APIView, WhatsAppMixin):
         if files.count() < 2:
             return Response({"error": "Select at least 2 PDFs"}, status=400)
 
-        for f in files:
-            if not f.filename.lower().endswith(".pdf"):
-                return Response({"error": "Only PDF files allowed"}, status=400)
+        output_path = os.path.join(UPLOAD_DIR, "merged.pdf")
 
-        filename = f"{uuid.uuid4()}.pdf"
-        output_path = os.path.join(UPLOAD_DIR, filename)
+        try:
+            merge_pdfs([f.file.path for f in files], output_path)
+        except Exception:
+            return Response({"error": "Merge failed"}, status=400)
 
-        merge_pdfs([f.file.path for f in files], output_path)
-
-        with open(output_path, "rb") as f:
-            merged = File.objects.create(
-                user=request.user,
-                file=DjangoFile(f, name=filename),
-                filename=filename,
-            )
-
-        self.send_whatsapp(request, merged, "📄 Your merged PDF is ready:")
-
-        return Response(
-            FileSerializer(merged, context={"request": request}).data,
-            status=201,
+        return FileResponse(
+            open(output_path, "rb"),
+            as_attachment=True,
+            filename="merged.pdf",
+            content_type="application/pdf",
         )
+
 
 
 # =====================================================
 # ✂ SPLIT PDF
 # =====================================================
-class SplitPDFView(APIView, WhatsAppMixin):
+class SplitPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
-
-        if not obj.filename.lower().endswith(".pdf"):
-            return Response({"error": "Only PDF files allowed"}, status=400)
-
         tmpdir = tempfile.mkdtemp()
 
         try:
             output_files = split_pdf(obj.file.path, tmpdir)
 
-            zip_name = f"{uuid.uuid4()}.zip"
-            zip_path = os.path.join(UPLOAD_DIR, zip_name)
-
+            zip_path = os.path.join(UPLOAD_DIR, "split_pages.zip")
             with zipfile.ZipFile(zip_path, "w") as z:
                 for p in output_files:
                     z.write(p, arcname=os.path.basename(p))
 
-            with open(zip_path, "rb") as f:
-                zip_file = File.objects.create(
-                    user=request.user,
-                    file=DjangoFile(f, name=zip_name),
-                    filename="split_pages.zip",
-                )
-
-            self.send_whatsapp(request, zip_file, "📦 Your split PDFs are ready:")
-
-            return Response(
-                FileSerializer(zip_file, context={"request": request}).data,
-                status=201,
+            return FileResponse(
+                open(zip_path, "rb"),
+                as_attachment=True,
+                filename="split_pages.zip",
+                content_type="application/zip",
             )
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
@@ -279,34 +258,26 @@ class SplitPDFView(APIView, WhatsAppMixin):
 # =====================================================
 # ✍ SIGN PDF
 # =====================================================
-class SignPDFView(APIView, WhatsAppMixin):
+class SignPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
-
-        if not obj.filename.lower().endswith(".pdf"):
-            return Response({"error": "Only PDF files allowed"}, status=400)
-
         signer = request.data.get("signer", "Signed User")
 
-        filename = f"{uuid.uuid4()}.pdf"
+        filename = f"signed_{obj.filename}"
         output_path = os.path.join(UPLOAD_DIR, filename)
 
-        sign_pdf(obj.file.path, output_path, signer)
+        try:
+            sign_pdf(obj.file.path, output_path, signer)
+        except Exception:
+            return Response({"error": "PDF signing failed"}, status=400)
 
-        with open(output_path, "rb") as f:
-            signed = File.objects.create(
-                user=request.user,
-                file=DjangoFile(f, name=filename),
-                filename=filename,
-            )
-
-        self.send_whatsapp(request, signed, "✍ Your signed PDF is ready:")
-
-        return Response(
-            FileSerializer(signed, context={"request": request}).data,
-            status=201,
+        return FileResponse(
+            open(output_path, "rb"),
+            as_attachment=True,
+            filename=filename,
+            content_type="application/pdf",
         )
 
 
