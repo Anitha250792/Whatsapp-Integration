@@ -11,6 +11,7 @@ from django.conf import settings
 from django.http import HttpResponse
 from .models import UserProfile
 import requests
+import re
 
 User = get_user_model()
 
@@ -119,46 +120,25 @@ class FacebookLoginAPIView(APIView):
             "email": user.email,
         })
     
-class UpdateWhatsappView(APIView):
-    permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        profile = request.user.userprofile
-
-        profile.whatsapp_number = request.data.get("whatsapp_number", "")
-        profile.whatsapp_enabled = request.data.get("whatsapp_enabled", True)
-        profile.save()
-
-        return Response({
-            "message": "WhatsApp settings saved",
-            "whatsapp_number": profile.whatsapp_number,
-            "enabled": profile.whatsapp_enabled
-        })
-    
 class UpdateWhatsAppView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        whatsapp_number = request.data.get("whatsapp_number")
+        number = request.data.get("whatsapp_number", "").strip()
+        enabled = request.data.get("whatsapp_enabled", False)
 
-        if not whatsapp_number:
-            return Response(
-                {"error": "WhatsApp number is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if enabled:
+            # +919876543210 format
+            if not re.fullmatch(r"\+[1-9]\d{7,14}", number):
+                return Response(
+                    {"error": "Enter WhatsApp number with country code (e.g. +919876543210)"},
+                    status=400
+                )
 
-        profile, _ = UserProfile.objects.get_or_create(
-            user=request.user
-        )
-
-        profile.whatsapp_number = whatsapp_number
-        profile.whatsapp_enabled = True
+        profile = request.user.userprofile
+        profile.whatsapp_number = number
+        profile.whatsapp_enabled = enabled
         profile.save()
 
-        return Response(
-            {
-                "message": "WhatsApp number saved successfully",
-                "whatsapp_number": whatsapp_number,
-            },
-            status=status.HTTP_200_OK,
-        )    
+        return Response({"message": "WhatsApp settings updated"})
