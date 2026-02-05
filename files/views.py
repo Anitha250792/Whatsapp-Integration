@@ -160,30 +160,12 @@ class WordToPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        original = get_object_or_404(File, id=file_id, user=request.user)
-
-        # 🚫 Web-only deployment (Render)
-        if not CELERY_ENABLED:
-            return Response(
-                {
-                    "message": "Word → PDF conversion queued. Processing will occur in background worker."
-                },
-                status=202,
-            )
-
-        # ✅ Worker-enabled environment
-        profile = getattr(request.user, "userprofile", None)
-        whatsapp = profile.whatsapp_number if profile else None
-
-        word_to_pdf_task.delay(
-            file_id=original.id,
-            user_id=request.user.id,
-            whatsapp_number=whatsapp,
-        )
-
         return Response(
-            {"message": "Word → PDF conversion started"},
-            status=202,
+            {
+                "error": "Word → PDF is disabled on this server. "
+                         "This feature requires a background worker."
+            },
+            status=501,
         )
 
 
@@ -194,33 +176,12 @@ class PDFToWordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        original = get_object_or_404(File, id=file_id, user=request.user)
-
-        if not original.filename.lower().endswith(".pdf"):
-            return Response({"error": "Only PDF allowed"}, status=400)
-
-        # 🚫 Web-only deployment (Render)
-        if not CELERY_ENABLED:
-            return Response(
-                {
-                    "message": "PDF → Word conversion queued. Processing will occur in background worker."
-                },
-                status=202,
-            )
-
-        # ✅ Worker-enabled environment
-        profile = getattr(request.user, "userprofile", None)
-        whatsapp = profile.whatsapp_number if profile else None
-
-        pdf_to_word_task.delay(
-            file_id=original.id,
-            user_id=request.user.id,
-            whatsapp_number=whatsapp,
-        )
-
         return Response(
-            {"message": "PDF → Word conversion started"},
-            status=202,
+            {
+                "error": "PDF → Word is disabled on this server. "
+                         "This feature requires a background worker."
+            },
+            status=501,
         )
 
 # =====================================================

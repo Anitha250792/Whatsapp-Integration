@@ -23,6 +23,7 @@ urlpatterns = [
 
     # 📁 File APIs (NO /api)
     path("files/", include("files.urls")),
+    
 ]
 
 if settings.DEBUG:
