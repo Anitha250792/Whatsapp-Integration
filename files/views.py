@@ -26,8 +26,10 @@ from .converters import (
     split_pdf,
     sign_pdf,
 )
-from files.tasks import word_to_pdf_task
-from files.tasks import pdf_to_word_task
+CELERY_ENABLED = getattr(settings, "CELERY_ENABLED", False)
+
+if CELERY_ENABLED:
+    from files.tasks import word_to_pdf_task, pdf_to_word_task
 # =====================================================
 # ⚙ CONFIG
 # =====================================================
@@ -160,6 +162,16 @@ class WordToPDFView(APIView):
     def post(self, request, file_id):
         original = get_object_or_404(File, id=file_id, user=request.user)
 
+        # 🚫 Web-only deployment (Render)
+        if not CELERY_ENABLED:
+            return Response(
+                {
+                    "message": "Word → PDF conversion queued. Processing will occur in background worker."
+                },
+                status=202,
+            )
+
+        # ✅ Worker-enabled environment
         profile = getattr(request.user, "userprofile", None)
         whatsapp = profile.whatsapp_number if profile else None
 
@@ -187,6 +199,16 @@ class PDFToWordView(APIView):
         if not original.filename.lower().endswith(".pdf"):
             return Response({"error": "Only PDF allowed"}, status=400)
 
+        # 🚫 Web-only deployment (Render)
+        if not CELERY_ENABLED:
+            return Response(
+                {
+                    "message": "PDF → Word conversion queued. Processing will occur in background worker."
+                },
+                status=202,
+            )
+
+        # ✅ Worker-enabled environment
         profile = getattr(request.user, "userprofile", None)
         whatsapp = profile.whatsapp_number if profile else None
 
@@ -200,7 +222,6 @@ class PDFToWordView(APIView):
             {"message": "PDF → Word conversion started"},
             status=202,
         )
-
 
 # =====================================================
 # ➕ MERGE PDFs
