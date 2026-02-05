@@ -236,23 +236,38 @@ class MergePDFView(APIView, WhatsAppMixin):
         if files.count() < 2:
             return Response({"error": "Select at least 2 PDFs"}, status=400)
 
-        filename = f"merged_{uuid.uuid4()}.pdf"
+        # ✅ Clean filename
+        names = [
+            os.path.splitext(f.filename)[0]
+            for f in files
+            if f.filename.lower().endswith(".pdf")
+        ]
+
+        base_name = "_".join(names[:2])  # avoid very long names
+        filename = f"merged_{base_name}.pdf"
+
         output_path = os.path.join(UPLOAD_DIR, filename)
 
+        # ✅ Merge safely
         merge_pdfs([f.file.path for f in files], output_path)
 
+        # ✅ Save merged file to DB
         with open(output_path, "rb") as f:
-            db_file = File.objects.create(
+            new_file = File.objects.create(
                 user=request.user,
                 file=DjangoFile(f, name=filename),
                 filename=filename,
             )
 
-        # 🔔 WhatsApp (optional)
-        self.send_whatsapp(request, db_file, "✅ PDFs merged successfully")
+        # 🔔 WhatsApp auto-send (optional)
+        self.send_whatsapp(
+            request,
+            new_file,
+            "✅ PDFs merged successfully",
+        )
 
         return Response(
-            FileSerializer(db_file, context={"request": request}).data,
+            FileSerializer(new_file, context={"request": request}).data,
             status=201,
         )
 
@@ -264,39 +279,50 @@ class SplitPDFView(APIView, WhatsAppMixin):
 
     def post(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
+
         tmpdir = tempfile.mkdtemp()
-        created_files = []
+        base_name = os.path.splitext(obj.filename)[0]
 
         try:
-            pages = split_pdf(obj.file.path, tmpdir)
+            # 1️⃣ Split PDF into pages
+            page_paths = split_pdf(obj.file.path, tmpdir)
 
-            for path in pages:
-                name = os.path.basename(path)
-
-                with open(path, "rb") as f:
-                    new_file = File.objects.create(
-                        user=request.user,
-                        file=DjangoFile(f, name=name),
-                        filename=name,
-                    )
-                    created_files.append(new_file)
-
-            # 🔔 WhatsApp (send first file link)
-            if created_files:
-                self.send_whatsapp(
-                    request,
-                    created_files[0],
-                    "✅ PDF split completed",
+            if not page_paths:
+                return Response(
+                    {"error": "PDF split failed"},
+                    status=500,
                 )
 
+            # 2️⃣ Create ZIP
+            zip_filename = f"{base_name}_split_pages.zip"
+            zip_path = os.path.join(UPLOAD_DIR, zip_filename)
+
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+                for index, page_path in enumerate(page_paths, start=1):
+                    page_name = f"{base_name}_page_{index}.pdf"
+                    zipf.write(page_path, arcname=page_name)
+
+            # 3️⃣ Save ZIP to DB
+            with open(zip_path, "rb") as f:
+                zip_file = File.objects.create(
+                    user=request.user,
+                    file=DjangoFile(f, name=zip_filename),
+                    filename=zip_filename,
+                )
+
+            # 4️⃣ WhatsApp (ONE message only)
+            self.send_whatsapp(
+                request,
+                zip_file,
+                "✅ PDF split completed (ZIP)",
+            )
+
+            # 5️⃣ Return ZIP info
             return Response(
-                FileSerializer(
-                    created_files,
-                    many=True,
-                    context={"request": request},
-                ).data,
+                FileSerializer(zip_file, context={"request": request}).data,
                 status=201,
             )
+
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -304,33 +330,48 @@ class SplitPDFView(APIView, WhatsAppMixin):
 # =====================================================
 # ✍ SIGN PDF
 # =====================================================
-class SignPDFView(APIView, WhatsAppMixin):
+class SignPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
         signer = request.data.get("signer", "Signed User")
 
-        filename = f"signed_{uuid.uuid4()}.pdf"
+        name, ext = os.path.splitext(obj.filename)
+        filename = f"{name}_signed{ext}"
         output_path = os.path.join(UPLOAD_DIR, filename)
 
         sign_pdf(obj.file.path, output_path, signer)
 
+        # ✅ SAVE SIGNED FILE
         with open(output_path, "rb") as f:
-            signed_file = File.objects.create(
+            new_file = File.objects.create(
                 user=request.user,
                 file=DjangoFile(f, name=filename),
                 filename=filename,
             )
 
-        self.send_whatsapp(
-            request,
-            signed_file,
-            "✍️ PDF signed successfully",
-        )
+        # ✅ WHATSAPP AUTO-SEND (HERE ⬇️⬇️⬇️)
+        profile = getattr(request.user, "userprofile", None)
+
+        if (
+            profile
+            and profile.whatsapp_enabled
+            and profile.can_send_whatsapp()
+        ):
+            public_url = request.build_absolute_uri(
+                f"/files/public/{new_file.public_token}/"
+            )
+
+            send_whatsapp_message(
+                profile.whatsapp_number,
+                f"📄 Signed file ready\n{public_url}",
+            )
+
+            profile.increment_whatsapp()
 
         return Response(
-            FileSerializer(signed_file, context={"request": request}).data,
+            {"message": "PDF signed successfully"},
             status=201,
         )
 
