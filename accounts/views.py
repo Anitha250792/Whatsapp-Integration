@@ -10,6 +10,8 @@ from google.auth.transport import requests as google_requests
 from django.conf import settings
 from django.http import HttpResponse
 from .models import UserProfile
+from django.core.exceptions import ValidationError
+from django.db import transaction
 import requests
 import re
 
@@ -128,17 +130,36 @@ class UpdateWhatsAppView(APIView):
         number = request.data.get("whatsapp_number", "").strip()
         enabled = request.data.get("whatsapp_enabled", False)
 
+        # ✅ Validation
         if enabled:
             # +919876543210 format
             if not re.fullmatch(r"\+[1-9]\d{7,14}", number):
                 return Response(
-                    {"error": "Enter WhatsApp number with country code (e.g. +919876543210)"},
-                    status=400
+                    {
+                        "error": "Enter WhatsApp number with country code (e.g. +919876543210)"
+                    },
+                    status=400,
                 )
 
-        profile = request.user.userprofile
-        profile.whatsapp_number = number
-        profile.whatsapp_enabled = enabled
-        profile.save()
+        try:
+            with transaction.atomic():
+                # ✅ SAFE: create profile if missing
+                profile, _ = UserProfile.objects.get_or_create(
+                    user=request.user
+                )
 
-        return Response({"message": "WhatsApp settings updated"})
+                profile.whatsapp_number = number
+                profile.whatsapp_enabled = enabled
+                profile.save()
+
+            return Response(
+                {"message": "WhatsApp settings updated successfully"},
+                status=200,
+            )
+
+        except Exception:
+            # 🔒 Never allow API to crash
+            return Response(
+                {"error": "Failed to update WhatsApp settings"},
+                status=500,
+            )
