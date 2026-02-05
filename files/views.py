@@ -328,7 +328,7 @@ class SplitPDFView(APIView, WhatsAppMixin):
 
 
 # =====================================================
-# ✍ SIGN PDF
+# ✍ SIGN PDF (SAFE + STABLE)
 # =====================================================
 class SignPDFView(APIView):
     permission_classes = [IsAuthenticated]
@@ -338,42 +338,68 @@ class SignPDFView(APIView):
         signer = request.data.get("signer", "Signed User")
 
         name, ext = os.path.splitext(obj.filename)
-        filename = f"{name}_signed{ext}"
-        output_path = os.path.join(UPLOAD_DIR, filename)
+        safe_name = name.replace(" ", "_")
+        filename = f"{safe_name}_signed{ext}"
 
-        sign_pdf(obj.file.path, output_path, signer)
+        # ✅ always use temp directory
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            output_path = tmp.name
 
-        # ✅ SAVE SIGNED FILE
-        with open(output_path, "rb") as f:
-            new_file = File.objects.create(
-                user=request.user,
-                file=DjangoFile(f, name=filename),
-                filename=filename,
+        try:
+            # 🧠 SIGN PDF
+            sign_pdf(obj.file.path, output_path, signer)
+
+            # 💾 SAVE TO DB
+            with open(output_path, "rb") as f:
+                new_file = File.objects.create(
+                    user=request.user,
+                    file=DjangoFile(f, name=filename),
+                    filename=filename,
+                )
+
+        except Exception as e:
+            print("❌ SIGN ERROR:", e)
+            return Response(
+                {"error": "Failed to sign PDF"},
+                status=500
             )
 
-        # ✅ WHATSAPP AUTO-SEND (HERE ⬇️⬇️⬇️)
-        profile = getattr(request.user, "userprofile", None)
+        finally:
+            if os.path.exists(output_path):
+                os.remove(output_path)
 
-        if (
-            profile
-            and profile.whatsapp_enabled
-            and profile.can_send_whatsapp()
-        ):
-            public_url = request.build_absolute_uri(
-                f"/files/public/{new_file.public_token}/"
-            )
+        # ================= WHATSAPP (NON-BLOCKING) =================
+        try:
+            profile = getattr(request.user, "userprofile", None)
 
-            send_whatsapp_message(
-                profile.whatsapp_number,
-                f"📄 Signed file ready\n{public_url}",
-            )
+            if (
+                profile
+                and profile.whatsapp_enabled
+                and profile.can_send_whatsapp()
+            ):
+                public_url = request.build_absolute_uri(
+                    f"/files/public/{new_file.public_token}/"
+                )
 
-            profile.increment_whatsapp()
+                send_whatsapp_message(
+                    profile.whatsapp_number,
+                    f"📄 Signed file ready\n{public_url}",
+                )
+
+                profile.increment_whatsapp()
+
+        except Exception as e:
+            # ⚠ WhatsApp should NEVER break signing
+            print("⚠ WhatsApp failed:", e)
 
         return Response(
-            {"message": "PDF signed successfully"},
+            {
+                "message": "PDF signed successfully",
+                "file": FileSerializer(new_file, context={"request": request}).data,
+            },
             status=201,
         )
+
 
 
 # =====================================================
