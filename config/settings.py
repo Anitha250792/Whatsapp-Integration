@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 from datetime import timedelta
 
+
 # --------------------------------------------------
 # BASE DIR
 # --------------------------------------------------
@@ -44,6 +45,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "dj_rest_auth",
     "dj_rest_auth.registration",
+    "django_celery_results",
 
     "allauth",
     "allauth.account",
@@ -274,5 +276,8 @@ WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 WHATSAPP_BUSINESS_ACCOUNT_ID = os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID")
 
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_BACKEND = "django-db"
 
-
+CELERY_BROKER_URL = "memory://"

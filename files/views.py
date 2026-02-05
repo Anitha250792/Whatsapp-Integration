@@ -26,7 +26,8 @@ from .converters import (
     split_pdf,
     sign_pdf,
 )
-
+from files.tasks import word_to_pdf_task
+from files.tasks import pdf_to_word_task
 # =====================================================
 # ⚙ CONFIG
 # =====================================================
@@ -153,21 +154,23 @@ class DownloadFileView(APIView):
 # =====================================================
 # 🔁 WORD → PDF (ASYNC)
 # =====================================================
-class WordToPDFView(APIView, WhatsAppMixin):
+class WordToPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
         original = get_object_or_404(File, id=file_id, user=request.user)
 
-        try:
-            filename = f"{uuid.uuid4()}.pdf"
-            output_path = os.path.join(UPLOAD_DIR, filename)
-            word_to_pdf(original.file.path, output_path)
-        except RuntimeError as e:
-            return Response({"error": str(e)}, status=503)
+        profile = getattr(request.user, "userprofile", None)
+        whatsapp = profile.whatsapp_number if profile else None
+
+        word_to_pdf_task.delay(
+            file_id=original.id,
+            user_id=request.user.id,
+            whatsapp_number=whatsapp,
+        )
 
         return Response(
-            {"message": "Word → PDF queued for background processing"},
+            {"message": "Word → PDF conversion started"},
             status=202,
         )
 
@@ -175,25 +178,26 @@ class WordToPDFView(APIView, WhatsAppMixin):
 # =====================================================
 # 🔁 PDF → WORD (ASYNC)
 # =====================================================
-class PDFToWordView(APIView, WhatsAppMixin):
+class PDFToWordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
         original = get_object_or_404(File, id=file_id, user=request.user)
 
         if not original.filename.lower().endswith(".pdf"):
-            return Response({"error": "Only PDF files allowed"}, status=400)
+            return Response({"error": "Only PDF allowed"}, status=400)
 
-        if original.file.size > MAX_FILE_BYTES:
-            return Response({"error": "PDF too large"}, status=400)
+        profile = getattr(request.user, "userprofile", None)
+        whatsapp = profile.whatsapp_number if profile else None
 
-        try:
-            pdf_to_word(original.file.path, "dummy.docx")
-        except RuntimeError as e:
-            return Response({"error": str(e)}, status=503)
+        pdf_to_word_task.delay(
+            file_id=original.id,
+            user_id=request.user.id,
+            whatsapp_number=whatsapp,
+        )
 
         return Response(
-            {"message": "PDF → Word queued for background processing"},
+            {"message": "PDF → Word conversion started"},
             status=202,
         )
 
@@ -201,7 +205,7 @@ class PDFToWordView(APIView, WhatsAppMixin):
 # =====================================================
 # ➕ MERGE PDFs
 # =====================================================
-class MergePDFView(APIView):
+class MergePDFView(APIView, WhatsAppMixin):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -211,46 +215,67 @@ class MergePDFView(APIView):
         if files.count() < 2:
             return Response({"error": "Select at least 2 PDFs"}, status=400)
 
-        output_path = os.path.join(UPLOAD_DIR, "merged.pdf")
+        filename = f"merged_{uuid.uuid4()}.pdf"
+        output_path = os.path.join(UPLOAD_DIR, filename)
 
         merge_pdfs([f.file.path for f in files], output_path)
 
-        response = FileResponse(
-            open(output_path, "rb"),
-            as_attachment=True,
-            filename="merged.pdf",
-            content_type="application/pdf",
-        )
-        response["Content-Length"] = os.path.getsize(output_path)
-        return response
+        with open(output_path, "rb") as f:
+            db_file = File.objects.create(
+                user=request.user,
+                file=DjangoFile(f, name=filename),
+                filename=filename,
+            )
 
+        # 🔔 WhatsApp (optional)
+        self.send_whatsapp(request, db_file, "✅ PDFs merged successfully")
+
+        return Response(
+            FileSerializer(db_file, context={"request": request}).data,
+            status=201,
+        )
 
 # =====================================================
 # ✂ SPLIT PDF
 # =====================================================
-class SplitPDFView(APIView):
+class SplitPDFView(APIView, WhatsAppMixin):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
         tmpdir = tempfile.mkdtemp()
+        created_files = []
 
         try:
             pages = split_pdf(obj.file.path, tmpdir)
-            zip_path = os.path.join(UPLOAD_DIR, "split_pages.zip")
 
-            with zipfile.ZipFile(zip_path, "w") as z:
-                for p in pages:
-                    z.write(p, arcname=os.path.basename(p))
+            for path in pages:
+                name = os.path.basename(path)
 
-            response = FileResponse(
-                open(zip_path, "rb"),
-                as_attachment=True,
-                filename="split_pages.zip",
-                content_type="application/zip",
+                with open(path, "rb") as f:
+                    new_file = File.objects.create(
+                        user=request.user,
+                        file=DjangoFile(f, name=name),
+                        filename=name,
+                    )
+                    created_files.append(new_file)
+
+            # 🔔 WhatsApp (send first file link)
+            if created_files:
+                self.send_whatsapp(
+                    request,
+                    created_files[0],
+                    "✅ PDF split completed",
+                )
+
+            return Response(
+                FileSerializer(
+                    created_files,
+                    many=True,
+                    context={"request": request},
+                ).data,
+                status=201,
             )
-            response["Content-Length"] = os.path.getsize(zip_path)
-            return response
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -258,29 +283,34 @@ class SplitPDFView(APIView):
 # =====================================================
 # ✍ SIGN PDF
 # =====================================================
-class SignPDFView(APIView):
+class SignPDFView(APIView, WhatsAppMixin):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
         obj = get_object_or_404(File, id=file_id, user=request.user)
         signer = request.data.get("signer", "Signed User")
 
-        filename = f"signed_{obj.filename}"
+        filename = f"signed_{uuid.uuid4()}.pdf"
         output_path = os.path.join(UPLOAD_DIR, filename)
 
-        try:
-            sign_pdf(obj.file.path, output_path, signer)
-        except RuntimeError as e:
-            return Response(
-        {"error": str(e)},
-        status=503
-    )
+        sign_pdf(obj.file.path, output_path, signer)
 
-        return FileResponse(
-            open(output_path, "rb"),
-            as_attachment=True,
-            filename=filename,
-            content_type="application/pdf",
+        with open(output_path, "rb") as f:
+            signed_file = File.objects.create(
+                user=request.user,
+                file=DjangoFile(f, name=filename),
+                filename=filename,
+            )
+
+        self.send_whatsapp(
+            request,
+            signed_file,
+            "✍️ PDF signed successfully",
+        )
+
+        return Response(
+            FileSerializer(signed_file, context={"request": request}).data,
+            status=201,
         )
 
 
