@@ -198,6 +198,8 @@ LOGIN_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/das
 LOGOUT_REDIRECT_URL = "https://whatsapp-integration-frontend-green.vercel.app/login"
 LOGIN_URL = "https://whatsapp-integration-frontend-green.vercel.app/login"
 
+FRONTEND_URL = "https://whatsapp-integration-frontend-green.vercel.app"
+
 # --------------------------------------------------
 # URL / TEMPLATES
 # --------------------------------------------------

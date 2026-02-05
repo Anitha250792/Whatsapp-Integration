@@ -1,24 +1,37 @@
 # files/converters.py
 import os
 import io
+import subprocess
 from PyPDF2 import PdfReader, PdfWriter, PdfMerger
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-
+from pdf2docx import Converter
 
 # ===============================
 # ❌ Web-disabled converters
 # ===============================
-def word_to_pdf(docx_path, output_path):
-    raise RuntimeError(
-        "Word to PDF conversion runs in background workers only"
+def word_to_pdf(input_path, output_dir):
+    subprocess.run(
+        [
+            "libreoffice",
+            "--headless",
+            "--convert-to",
+            "pdf",
+            input_path,
+            "--outdir",
+            output_dir,
+        ],
+        check=True,
     )
 
+    base = os.path.splitext(os.path.basename(input_path))[0]
+    return os.path.join(output_dir, f"{base}.pdf")
 
-def pdf_to_word(pdf_path, output_path):
-    raise RuntimeError(
-        "PDF to Word conversion runs in background workers only"
-    )
+
+def pdf_to_word(input_path, output_path):
+    cv = Converter(input_path)
+    cv.convert(output_path)
+    cv.close()
 
 
 # ===============================
