@@ -6,33 +6,25 @@ from PyPDF2 import PdfReader, PdfWriter, PdfMerger
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from pdf2docx import Converter
+from docx2pdf import convert
 
 # ===============================
 # ❌ Web-disabled converters
 # ===============================
 def word_to_pdf(input_path, output_dir):
-    subprocess.run(
-        [
-            "libreoffice",
-            "--headless",
-            "--convert-to",
-            "pdf",
-            input_path,
-            "--outdir",
-            output_dir,
-        ],
-        check=True,
+    os.makedirs(output_dir, exist_ok=True)
+    output_pdf = os.path.join(
+        output_dir,
+        os.path.splitext(os.path.basename(input_path))[0] + ".pdf"
     )
-
-    base = os.path.splitext(os.path.basename(input_path))[0]
-    return os.path.join(output_dir, f"{base}.pdf")
+    convert(input_path, output_pdf)
+    return output_pdf
 
 
 def pdf_to_word(input_path, output_path):
     cv = Converter(input_path)
-    cv.convert(output_path)
+    cv.convert(output_path, start=0, end=None)
     cv.close()
-
 
 # ===============================
 # SAFE OPERATIONS
