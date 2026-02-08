@@ -19,7 +19,7 @@ from .models import File
 from .serializers import FileSerializer
 from .converters import merge_pdfs, split_pdf
 from .pdf_utils import sign_pdf
-from accounts.utils import send_whatsapp_if_allowed
+from files.whatsapp import send_whatsapp_message
 from django.utils import timezone
 
 
@@ -85,8 +85,10 @@ class WhatsAppMixin:
 
         send_whatsapp_message(
             profile.whatsapp_number,
-            f"{title}\n{public_url}",
+            title,
+            media_url=public_url
         )
+
 
         mark_whatsapp_sent(profile)
 
@@ -158,25 +160,34 @@ class DownloadFileView(APIView):
 # =====================================================
 # 🔁 WORD → PDF (ASYNC)
 # =====================================================
+  
 class WordToPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
+        # 1️⃣ Server capability check
         if not settings.LOCAL_CONVERSION:
             return Response(
                 {"error": "Word → PDF not supported on this server"},
-                status=501
+                status=501,
             )
-        
 
-        file = get_object_or_404(File, id=file_id, user=request.user)
+        # 2️⃣ Get original file
+        original_file = get_object_or_404(
+            File, id=file_id, user=request.user
+        )
 
+        # 3️⃣ Convert Word → PDF
         from docx2pdf import convert
+
         output_name = f"{uuid.uuid4()}.pdf"
-        output_path = os.path.join(settings.MEDIA_ROOT, "uploads", output_name)
+        output_path = os.path.join(
+            settings.MEDIA_ROOT, "uploads", output_name
+        )
 
-        convert(file.file.path, output_path)
+        convert(original_file.file.path, output_path)
 
+        # 4️⃣ Save converted file to DB
         with open(output_path, "rb") as f:
             new_file = File.objects.create(
                 user=request.user,
@@ -184,9 +195,32 @@ class WordToPDFView(APIView):
                 filename=output_name,
             )
 
-        send_whatsapp_if_allowed(
-            request.user,
-            f"📄 Word → PDF ready\n{new_file.public_url}"
+        # 5️⃣ Build public URL (IMPORTANT for WhatsApp)
+        public_url = request.build_absolute_uri(
+            f"/files/public/{new_file.public_token}/"
+        )
+
+        # 6️⃣ WhatsApp send (SAFE, NON-BLOCKING)
+        profile = getattr(request.user, "userprofile", None)
+
+        if (
+            profile
+            and profile.whatsapp_enabled
+            and profile.can_send_whatsapp()
+        ):
+            send_whatsapp_message(
+                profile.whatsapp_number,
+                "✅ Word → PDF completed",
+                media_url=public_url,
+            )
+            profile.increment_whatsapp()
+
+        # 7️⃣ API response
+        return Response(
+            FileSerializer(
+                new_file, context={"request": request}
+            ).data,
+            status=201,
         )
 
        
@@ -231,10 +265,16 @@ class MergePDFView(APIView):
                 filename=filename,
             )
 
-        send_whatsapp_if_allowed(
-            request.user,
-            f"📄 PDFs merged successfully\n{new_file.public_url}"
+        public_url = request.build_absolute_uri(
+            f"/files/public/{new_file.public_token}/"
         )
+
+        send_whatsapp_message(
+            request.user.userprofile.whatsapp_number,
+            "📄 PDFs merged successfully",
+            media_url=public_url
+        )
+
 
         return Response(
             FileSerializer(new_file, context={"request": request}).data,
@@ -248,19 +288,32 @@ class SplitPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        obj = get_object_or_404(File, id=file_id, user=request.user)
+        # 1️⃣ Get original PDF
+        original_file = get_object_or_404(
+            File, id=file_id, user=request.user
+        )
+
         tmpdir = tempfile.mkdtemp()
-        base = os.path.splitext(obj.filename)[0]
+        base_name = os.path.splitext(original_file.filename)[0]
 
         try:
-            pages = split_pdf(obj.file.path, tmpdir)
-            zip_name = f"{base}_split.zip"
-            zip_path = os.path.join(settings.MEDIA_ROOT, "uploads", zip_name)
+            # 2️⃣ Split PDF into pages
+            pages = split_pdf(original_file.file.path, tmpdir)
+
+            # 3️⃣ Create ZIP file
+            zip_name = f"{base_name}_split.zip"
+            zip_path = os.path.join(
+                settings.MEDIA_ROOT, "uploads", zip_name
+            )
 
             with zipfile.ZipFile(zip_path, "w") as zipf:
-                for i, page in enumerate(pages, start=1):
-                    zipf.write(page, arcname=f"{base}_page_{i}.pdf")
+                for i, page_path in enumerate(pages, start=1):
+                    zipf.write(
+                        page_path,
+                        arcname=f"{base_name}_page_{i}.pdf",
+                    )
 
+            # 4️⃣ Save ZIP to DB
             with open(zip_path, "rb") as f:
                 zip_file = File.objects.create(
                     user=request.user,
@@ -268,16 +321,36 @@ class SplitPDFView(APIView):
                     filename=zip_name,
                 )
 
-            send_whatsapp_if_allowed(
-                request.user,
-                f"📄 PDF split completed\n{zip_file.public_url}"
+            # 5️⃣ Public URL for WhatsApp
+            public_url = request.build_absolute_uri(
+                f"/files/public/{zip_file.public_token}/"
             )
 
+            # 6️⃣ WhatsApp send (SAFE)
+            profile = getattr(request.user, "userprofile", None)
+
+            if (
+                profile
+                and profile.whatsapp_enabled
+                and profile.can_send_whatsapp()
+            ):
+                send_whatsapp_message(
+                    profile.whatsapp_number,
+                    "📄 PDF split completed",
+                    media_url=public_url,
+                )
+                profile.increment_whatsapp()
+
+            # 7️⃣ API response
             return Response(
-                FileSerializer(zip_file, context={"request": request}).data,
+                FileSerializer(
+                    zip_file, context={"request": request}
+                ).data,
                 status=201,
             )
+
         finally:
+            # 8️⃣ Always clean temp files
             shutil.rmtree(tmpdir, ignore_errors=True)
 
 
@@ -288,17 +361,32 @@ class SignPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
+        # 1️⃣ Validate signer
         signer = request.data.get("signer", "").strip()
         if not signer:
-            return Response({"error": "Signer name required"}, status=400)
+            return Response(
+                {"error": "Signer name required"},
+                status=400,
+            )
 
-        original = get_object_or_404(File, id=file_id, user=request.user)
+        # 2️⃣ Get original file
+        original_file = get_object_or_404(
+            File, id=file_id, user=request.user
+        )
 
+        # 3️⃣ Sign PDF
         output_name = f"signed_{uuid.uuid4()}.pdf"
-        output_path = os.path.join(settings.MEDIA_ROOT, "uploads", output_name)
+        output_path = os.path.join(
+            settings.MEDIA_ROOT, "uploads", output_name
+        )
 
-        sign_pdf(original.file.path, output_path, signer)
+        sign_pdf(
+            original_file.file.path,
+            output_path,
+            signer,
+        )
 
+        # 4️⃣ Save signed file
         with open(output_path, "rb") as f:
             new_file = File.objects.create(
                 user=request.user,
@@ -306,52 +394,34 @@ class SignPDFView(APIView):
                 filename=output_name,
             )
 
-        send_whatsapp_if_allowed(
-            request.user,
-            f"✍️ PDF signed successfully\n{new_file.public_url}"
+        # 5️⃣ Build public URL
+        public_url = request.build_absolute_uri(
+            f"/files/public/{new_file.public_token}/"
         )
 
+        # 6️⃣ WhatsApp send (SAFE, NON-BLOCKING)
+        profile = getattr(request.user, "userprofile", None)
+
+        if (
+            profile
+            and profile.whatsapp_enabled
+            and profile.can_send_whatsapp()
+        ):
+            send_whatsapp_message(
+                profile.whatsapp_number,
+                "✍️ PDF signed successfully",
+                media_url=public_url,
+            )
+            profile.increment_whatsapp()
+
+        # 7️⃣ API response
         return Response(
-            FileSerializer(new_file, context={"request": request}).data,
+            FileSerializer(
+                new_file, context={"request": request}
+            ).data,
             status=201,
         )
-
-
-
-
-        # ================= WHATSAPP (NON-BLOCKING) =================
-        try:
-            profile = getattr(request.user, "userprofile", None)
-
-            if (
-                profile
-                and profile.whatsapp_enabled
-                and profile.can_send_whatsapp()
-            ):
-                public_url = request.build_absolute_uri(
-                    f"/files/public/{new_file.public_token}/"
-                )
-
-                send_whatsapp_message(
-                    profile.whatsapp_number,
-                    f"📄 Signed file ready\n{public_url}",
-                )
-
-                profile.increment_whatsapp()
-
-        except Exception as e:
-            # ⚠ WhatsApp should NEVER break signing
-            print("⚠ WhatsApp failed:", e)
-
-        return Response(
-            {
-                "message": "PDF signed successfully",
-                "file": FileSerializer(new_file, context={"request": request}).data,
-            },
-            status=201,
-        )
-
-
+        
 
 # =====================================================
 # 🌍 PUBLIC DOWNLOAD
