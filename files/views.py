@@ -20,6 +20,9 @@ from .serializers import FileSerializer
 from .converters import merge_pdfs, split_pdf
 from .pdf_utils import sign_pdf
 from accounts.utils import send_whatsapp_if_allowed
+from django.utils import timezone
+
+
 
 CELERY_ENABLED = getattr(settings, "CELERY_ENABLED", False)
 
@@ -34,6 +37,19 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 MAX_FILE_MB = 10
 MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
 
+
+class SendFileToWhatsAppView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, file_id):
+        file = get_object_or_404(File, id=file_id, user=request.user)
+
+        send_whatsapp_if_allowed(
+            request.user,
+            f"📄 File ready\n{file.public_url}"
+        )
+
+        return Response({"message": "File sent to WhatsApp"})
 
 # =====================================================
 # 🔔 WHATSAPP SAFETY (OPTIONAL – NEVER BLOCKS CORE)
@@ -79,14 +95,13 @@ class WhatsAppMixin:
 # 📂 LIST FILES
 # =====================================================
 class FileListView(ListAPIView):
-    permission_classes = [IsAuthenticated]
     serializer_class = FileSerializer
+    permission_classes = [] if settings.DEV_BYPASS_LOGIN else [IsAuthenticated]
 
     def get_queryset(self):
+        if settings.DEV_BYPASS_LOGIN:
+            return File.objects.all().order_by("-id")
         return File.objects.filter(user=self.request.user).order_by("-id")
-
-    def get_serializer_context(self):
-        return {"request": self.request}
 
 # =====================================================
 # ⬆ UPLOAD
@@ -147,15 +162,34 @@ class WordToPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
-        return Response(
-            {
-                "error": "Word → PDF is disabled on this server. "
-                         "This feature requires a background worker."
-            },
-            status=501,
+        if not settings.LOCAL_CONVERSION:
+            return Response(
+                {"error": "Word → PDF not supported on this server"},
+                status=501
+            )
+        
+
+        file = get_object_or_404(File, id=file_id, user=request.user)
+
+        from docx2pdf import convert
+        output_name = f"{uuid.uuid4()}.pdf"
+        output_path = os.path.join(settings.MEDIA_ROOT, "uploads", output_name)
+
+        convert(file.file.path, output_path)
+
+        with open(output_path, "rb") as f:
+            new_file = File.objects.create(
+                user=request.user,
+                file=DjangoFile(f, name=output_name),
+                filename=output_name,
+            )
+
+        send_whatsapp_if_allowed(
+            request.user,
+            f"📄 Word → PDF ready\n{new_file.public_url}"
         )
 
-
+       
 # =====================================================
 # 🔁 PDF → WORD (ASYNC)
 # =====================================================
@@ -337,3 +371,4 @@ class PublicDownloadView(APIView):
             as_attachment=True,
             filename=obj.filename
         )
+    

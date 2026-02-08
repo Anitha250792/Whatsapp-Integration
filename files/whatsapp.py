@@ -1,37 +1,20 @@
-# files/whatsapp.py
-import requests
+from twilio.rest import Client
 from django.conf import settings
 
-
-def send_whatsapp_message(to_number, message_text):
+def send_whatsapp_message(to_number: str, message: str):
     """
-    Sends a WhatsApp message using Meta WhatsApp Cloud API
+    Sends WhatsApp message via Twilio
     """
+    if not to_number:
+        return
 
-    if not settings.WHATSAPP_ACCESS_TOKEN or not settings.WHATSAPP_PHONE_NUMBER_ID:
-        raise ValueError("WhatsApp credentials are not configured")
+    client = Client(
+        settings.TWILIO_ACCOUNT_SID,
+        settings.TWILIO_AUTH_TOKEN,
+    )
 
-    url = f"https://graph.facebook.com/v19.0/{settings.WHATSAPP_PHONE_NUMBER_ID}/messages"
-
-    headers = {
-        "Authorization": f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}",
-        "Content-Type": "application/json",
-    }
-
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to_number,
-        "type": "text",
-        "text": {
-            "body": message_text
-        },
-    }
-
-    response = requests.post(url, json=payload, headers=headers, timeout=15)
-
-    if response.status_code not in (200, 201):
-        raise Exception(
-            f"WhatsApp API error {response.status_code}: {response.text}"
-        )
-
-    return response.json()
+    client.messages.create(
+        from_=settings.TWILIO_WHATSAPP_FROM,
+        to=f"whatsapp:{to_number.replace('whatsapp:', '')}",
+        body=message,
+    )

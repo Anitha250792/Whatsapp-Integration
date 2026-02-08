@@ -4,7 +4,7 @@ from django.utils import timezone
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    whatsapp_number = models.CharField(max_length=15, blank=True)
+    whatsapp_number = models.CharField(max_length=20, blank=True, null=True)
     whatsapp_enabled = models.BooleanField(default=True)
 
     daily_whatsapp_count = models.PositiveIntegerField(default=0)

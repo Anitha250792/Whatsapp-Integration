@@ -1,9 +1,10 @@
 """
 Django settings for config project.
 """
-
-from pathlib import Path
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
 from datetime import timedelta
 
 
@@ -11,6 +12,10 @@ from datetime import timedelta
 # BASE DIR
 # --------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / ".env")
+
+LOCAL_CONVERSION = False
 
 # --------------------------------------------------
 # SECURITY
@@ -93,7 +98,9 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
+DEV_BYPASS_LOGIN = False
 
+SKIP_AUTH_LOCALLY = DEBUG
 
 # --------------------------------------------------
 # DJ-REST-AUTH
@@ -177,7 +184,7 @@ SOCIALACCOUNT_PROVIDERS = {
 # --------------------------------------------------
 # CORS
 # --------------------------------------------------
-CORS_ALLOW_ALL_ORIGINS = True
+
 CORS_ALLOWED_ORIGINS = [
     "https://whatsapp-integration-frontend-green.vercel.app",
 ]
