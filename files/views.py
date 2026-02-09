@@ -8,6 +8,7 @@ from django.http import FileResponse, Http404
 from django.core.files import File as DjangoFile
 from django.shortcuts import get_object_or_404
 from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
 
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -22,6 +23,8 @@ from .pdf_utils import sign_pdf
 from files.whatsapp import send_whatsapp_message
 from django.utils import timezone
 from uuid import UUID
+from files.whatsapp_utils import try_send_whatsapp
+
 
 
 CELERY_ENABLED = getattr(settings, "CELERY_ENABLED", False)
@@ -37,6 +40,30 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 MAX_FILE_MB = 10
 MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
 
+@csrf_exempt
+def whatsapp_incoming(request):
+    """
+    Webhook called by Twilio when user replies on WhatsApp.
+    This opens the 24-hour WhatsApp window.
+    """
+    from_number = request.POST.get("From", "")
+    from_number = from_number.replace("whatsapp:", "")
+
+    try:
+        profile = request.user.userprofile  # fallback
+    except Exception:
+        from accounts.models import UserProfile
+        try:
+            profile = UserProfile.objects.get(
+                whatsapp_number=from_number
+            )
+        except UserProfile.DoesNotExist:
+            return HttpResponse("OK")
+
+    profile.last_whatsapp_interaction = timezone.now()
+    profile.save(update_fields=["last_whatsapp_interaction"])
+
+    return HttpResponse("OK")
 
 class SendFileToWhatsAppView(APIView):
     permission_classes = [IsAuthenticated]
@@ -54,14 +81,14 @@ class SendFileToWhatsAppView(APIView):
                 f"/files/public/{file.public_token}/"
             )
 
-            send_whatsapp_message(
-                profile.whatsapp_number,
+            try_send_whatsapp(
+                request.user,
+                request,
+                file,
                 "📄 File ready",
-                media_url=public_url,
-            )
-            profile.increment_whatsapp()
+             )
 
-        return Response({"message": "WhatsApp sent"}, status=200)
+        return Response({"message": "WhatsApp attempted"}, status=200)
 
 # =====================================================
 # 🔔 WHATSAPP SAFETY (OPTIONAL – NEVER BLOCKS CORE)
@@ -213,19 +240,13 @@ class WordToPDFView(APIView):
         )
 
         # 6️⃣ WhatsApp send (SAFE, NON-BLOCKING)
-        profile = getattr(request.user, "userprofile", None)
+        try_send_whatsapp(
+            request.user,
+            request,
+            new_file,
+            "✅ Word → PDF completed",
+         )
 
-        if (
-            profile
-            and profile.whatsapp_enabled
-            and profile.can_send_whatsapp()
-        ):
-            send_whatsapp_message(
-                profile.whatsapp_number,
-                "✅ Word → PDF completed",
-                media_url=public_url,
-            )
-            profile.increment_whatsapp()
 
         # 7️⃣ API response
         return Response(
@@ -281,11 +302,13 @@ class MergePDFView(APIView):
             f"/files/public/{new_file.public_token}/"
         )
 
-        send_whatsapp_message(
-            request.user.userprofile.whatsapp_number,
+        try_send_whatsapp(
+            request.user,
+            request,
+            new_file,
             "📄 PDFs merged successfully",
-            media_url=public_url
-        )
+         )
+
 
 
         return Response(
@@ -346,12 +369,13 @@ class SplitPDFView(APIView):
                 and profile.whatsapp_enabled
                 and profile.can_send_whatsapp()
             ):
-                send_whatsapp_message(
-                    profile.whatsapp_number,
-                    "📄 PDF split completed",
-                    media_url=public_url,
-                )
-                profile.increment_whatsapp()
+                try_send_whatsapp(
+                    request.user,
+                    request,
+                    zip_file,
+                     "📄 PDF split completed",
+)
+
 
             # 7️⃣ API response
             return Response(
@@ -419,12 +443,13 @@ class SignPDFView(APIView):
             and profile.whatsapp_enabled
             and profile.can_send_whatsapp()
         ):
-            send_whatsapp_message(
-                profile.whatsapp_number,
+            try_send_whatsapp(
+                request.user,
+                request,
+                new_file,
                 "✍️ PDF signed successfully",
-                media_url=public_url,
-            )
-            profile.increment_whatsapp()
+             )
+
 
         # 7️⃣ API response
         return Response(

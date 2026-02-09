@@ -11,6 +11,7 @@ from .views import (
     SignPDFView,
     PublicDownloadView,
     SendFileToWhatsAppView,
+    whatsapp_incoming,
 )
 
 urlpatterns = [
@@ -31,6 +32,7 @@ urlpatterns = [
     path("send-whatsapp/<int:file_id>/", SendFileToWhatsAppView.as_view()),
     # files/urls.py
     path("webhooks/whatsapp/", whatsapp_incoming),
+    
    
     
 ]
