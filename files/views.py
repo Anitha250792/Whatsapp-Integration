@@ -21,7 +21,7 @@ from .converters import merge_pdfs, split_pdf
 from .pdf_utils import sign_pdf
 from files.whatsapp import send_whatsapp_message
 from django.utils import timezone
-
+from uuid import UUID
 
 
 CELERY_ENABLED = getattr(settings, "CELERY_ENABLED", False)
@@ -431,14 +431,20 @@ class PublicDownloadView(APIView):
     permission_classes = []
 
     def get(self, request, token):
+        try:
+            token = UUID(token)  # ✅ convert string → UUID
+        except ValueError:
+            raise Http404("Invalid token")
+
         obj = get_object_or_404(File, public_token=token)
 
         if not obj.file or not os.path.exists(obj.file.path):
             raise Http404("File not found")
 
-        return FileResponse(
-            obj.file.open("rb"),
-            as_attachment=True,
-            filename=obj.filename
-        )
-    
+        with open(obj.file.path, "rb") as f:
+            response = HttpResponse(
+                f.read(),
+                content_type="application/octet-stream",
+            )
+            response["Content-Disposition"] = f'attachment; filename="{obj.filename}"'
+            return response
