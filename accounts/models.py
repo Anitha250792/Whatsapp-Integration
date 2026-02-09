@@ -1,30 +1,23 @@
-from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    whatsapp_number = models.CharField(max_length=20, blank=True, null=True)
-    whatsapp_enabled = models.BooleanField(default=True)
+    whatsapp_number = models.CharField(max_length=20, blank=True)
+    whatsapp_enabled = models.BooleanField(default=False)
 
-    daily_whatsapp_count = models.PositiveIntegerField(default=0)
-    last_whatsapp_date = models.DateField(null=True, blank=True)
-
-    DAILY_LIMIT = 5  # free plan
+    last_whatsapp_interaction = models.DateTimeField(null=True, blank=True)
+    whatsapp_count = models.PositiveIntegerField(default=0)
 
     def can_send_whatsapp(self):
-        today = timezone.now().date()
-
-        if self.last_whatsapp_date != today:
-            self.daily_whatsapp_count = 0
-            self.last_whatsapp_date = today
-            self.save()
-
-        return self.daily_whatsapp_count < self.DAILY_LIMIT
+        return self.whatsapp_count < 100  # or your limit
 
     def increment_whatsapp(self):
-        self.daily_whatsapp_count += 1
-        self.save()
+        self.whatsapp_count += 1
+        self.save(update_fields=["whatsapp_count"])
 
-    def __str__(self):
-        return self.user.username
+    def within_24h_window(self):
+        if not self.last_whatsapp_interaction:
+            return False
+        return timezone.now() - self.last_whatsapp_interaction < timezone.timedelta(hours=24)

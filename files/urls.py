@@ -29,6 +29,8 @@ urlpatterns = [
     path("split/<int:file_id>/", SplitPDFView.as_view()),
     path("sign/<int:file_id>/", SignPDFView.as_view()),
     path("send-whatsapp/<int:file_id>/", SendFileToWhatsAppView.as_view()),
-
+    # files/urls.py
+    path("webhooks/whatsapp/", whatsapp_incoming),
+   
     
 ]

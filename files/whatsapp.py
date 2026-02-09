@@ -1,15 +1,13 @@
 from django.conf import settings
 from twilio.rest import Client
 
-
 def send_whatsapp_message(to, body, media_url=None):
-    # ✅ Check Twilio config
     if not all([
         getattr(settings, "TWILIO_ACCOUNT_SID", None),
         getattr(settings, "TWILIO_AUTH_TOKEN", None),
         getattr(settings, "TWILIO_WHATSAPP_FROM", None),
     ]):
-        print("⚠️ Twilio not configured, skipping WhatsApp")
+        print("⚠️ Twilio not configured")
         return False
 
     try:
@@ -25,11 +23,11 @@ def send_whatsapp_message(to, body, media_url=None):
             media_url=[media_url] if media_url else None,
         )
 
-        # ✅ IMPORTANT LOGS
-        print("📨 WhatsApp SID:", message.sid)
-        print("📊 WhatsApp STATUS:", message.status)
+        print("📨 SID:", message.sid)
+        print("📊 STATUS:", message.status)
 
-        return True
+        # ✅ Only accept queued/sent
+        return message.status in ("queued", "sent")
 
     except Exception as e:
         print("❌ WhatsApp failed:", str(e))
