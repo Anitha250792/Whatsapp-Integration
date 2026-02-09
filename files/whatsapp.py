@@ -3,6 +3,7 @@ from twilio.rest import Client
 
 
 def send_whatsapp_message(to, body, media_url=None):
+    # ✅ Check Twilio config
     if not all([
         getattr(settings, "TWILIO_ACCOUNT_SID", None),
         getattr(settings, "TWILIO_AUTH_TOKEN", None),
@@ -24,9 +25,12 @@ def send_whatsapp_message(to, body, media_url=None):
             media_url=[media_url] if media_url else None,
         )
 
-        print("✅ WhatsApp sent:", message.sid)
+        # ✅ IMPORTANT LOGS
+        print("📨 WhatsApp SID:", message.sid)
+        print("📊 WhatsApp STATUS:", message.status)
+
         return True
 
     except Exception as e:
-        print("❌ WhatsApp failed:", e)
+        print("❌ WhatsApp failed:", str(e))
         return False
