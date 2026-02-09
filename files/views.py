@@ -43,13 +43,25 @@ class SendFileToWhatsAppView(APIView):
 
     def post(self, request, file_id):
         file = get_object_or_404(File, id=file_id, user=request.user)
+        profile = getattr(request.user, "userprofile", None)
 
-        send_whatsapp_if_allowed(
-            request.user,
-            f"📄 File ready\n{file.public_url}"
-        )
+        if (
+            profile
+            and profile.whatsapp_enabled
+            and profile.can_send_whatsapp()
+        ):
+            public_url = request.build_absolute_uri(
+                f"/files/public/{file.public_token}/"
+            )
 
-        return Response({"message": "File sent to WhatsApp"})
+            send_whatsapp_message(
+                profile.whatsapp_number,
+                "📄 File ready",
+                media_url=public_url,
+            )
+            profile.increment_whatsapp()
+
+        return Response({"message": "WhatsApp sent"}, status=200)
 
 # =====================================================
 # 🔔 WHATSAPP SAFETY (OPTIONAL – NEVER BLOCKS CORE)
