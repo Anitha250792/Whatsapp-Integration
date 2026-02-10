@@ -195,7 +195,7 @@ CORS_ALLOW_HEADERS = [
     "content-type",
 ]
 
-CSRF_TRUSTED_ORIGINS = ["https://whatsapp-integration-frontend-green.vercel.app"]
+CSRF_TRUSTED_ORIGINS = ["https://whatsapp-integration-frontend-green.vercel.app",  "https://whatsapp-integration-u7tq.onrender.com",]
 SESSION_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SECURE = True
 
