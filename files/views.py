@@ -4,7 +4,7 @@ import zipfile
 import tempfile
 import shutil
 
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
 from django.core.files import File as DjangoFile
 from django.shortcuts import get_object_or_404
 from django.conf import settings
@@ -505,5 +505,14 @@ def whatsapp_status_callback(request):
     if error_code:
         print("❌ Error Code:", error_code)
         print("❌ Error Message:", error_message)
+
+    return HttpResponse("OK")
+    
+@csrf_exempt
+def whatsapp_status_webhook(request):
+    sid = request.POST.get("MessageSid")
+    status = request.POST.get("MessageStatus")
+
+    print("📩 WhatsApp Status:", sid, status)
 
     return HttpResponse("OK")
