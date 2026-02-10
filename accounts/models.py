@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    whatsapp_number = models.CharField(max_length=20, blank=True)
+    whatsapp_number = models.CharField(max_length=20, blank=True, null=True)
     whatsapp_enabled = models.BooleanField(default=False)
 
     last_whatsapp_interaction = models.DateTimeField(null=True, blank=True)
