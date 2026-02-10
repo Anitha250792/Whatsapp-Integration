@@ -13,6 +13,8 @@ from .views import (
     SendFileToWhatsAppView,
     whatsapp_incoming,
 )
+from .views import whatsapp_status_callback
+
 
 urlpatterns = [
     
@@ -32,7 +34,7 @@ urlpatterns = [
     path("send-whatsapp/<int:file_id>/", SendFileToWhatsAppView.as_view()),
     # files/urls.py
     path("webhooks/whatsapp/", whatsapp_incoming),
-    
-   
+    path("webhooks/whatsapp-status/", whatsapp_status_callback),
+  
     
 ]

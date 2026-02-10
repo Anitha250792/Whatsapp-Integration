@@ -485,3 +485,25 @@ class PublicDownloadView(APIView):
             )
             response["Content-Disposition"] = f'attachment; filename="{obj.filename}"'
             return response
+        
+@csrf_exempt
+def whatsapp_status_callback(request):
+    """
+    Webhook called by Twilio for delivery status updates
+    """
+    message_sid = request.POST.get("MessageSid")
+    message_status = request.POST.get("MessageStatus")
+    to_number = request.POST.get("To")
+    error_code = request.POST.get("ErrorCode")
+    error_message = request.POST.get("ErrorMessage")
+
+    print("📊 WhatsApp Delivery Update")
+    print("SID:", message_sid)
+    print("STATUS:", message_status)
+    print("TO:", to_number)
+
+    if error_code:
+        print("❌ Error Code:", error_code)
+        print("❌ Error Message:", error_message)
+
+    return HttpResponse("OK")

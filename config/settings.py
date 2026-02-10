@@ -299,3 +299,8 @@ if "celery" in INSTALLED_APPS or True:
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM")
+
+TWILIO_WHATSAPP_STATUS_CALLBACK = (
+    "https://whatsapp-integration-u7tq.onrender.com/"
+    "files/webhooks/whatsapp-status/"
+)

@@ -17,11 +17,13 @@ def send_whatsapp_message(to, body, media_url=None):
         )
 
         message = client.messages.create(
-            from_=settings.TWILIO_WHATSAPP_FROM,
-            to=f"whatsapp:{to}" if not to.startswith("whatsapp:") else to,
-            body=body,
-            media_url=[media_url] if media_url else None,
-        )
+    from_=settings.TWILIO_WHATSAPP_FROM,
+    to=f"whatsapp:{to}" if not to.startswith("whatsapp:") else to,
+    body=body,
+    media_url=[media_url] if media_url else None,
+
+    status_callback=settings.TWILIO_WHATSAPP_STATUS_CALLBACK,
+)
 
         print("📨 SID:", message.sid)
         print("📊 STATUS:", message.status)
