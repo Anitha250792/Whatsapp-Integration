@@ -128,11 +128,10 @@ class UpdateWhatsAppView(APIView):
 
     def post(self, request):
         number = request.data.get("whatsapp_number", "").strip()
-        enabled = request.data.get("whatsapp_enabled", False)
+        enabled = bool(request.data.get("whatsapp_enabled", False))
 
-        # ✅ Validation
+        # ✅ Validate number only if enabled
         if enabled:
-            # +919876543210 format
             if not re.fullmatch(r"\+[1-9]\d{7,14}", number):
                 return Response(
                     {
@@ -143,7 +142,6 @@ class UpdateWhatsAppView(APIView):
 
         try:
             with transaction.atomic():
-                # ✅ SAFE: create profile if missing
                 profile, _ = UserProfile.objects.get_or_create(
                     user=request.user
                 )
@@ -157,8 +155,8 @@ class UpdateWhatsAppView(APIView):
                 status=200,
             )
 
-        except Exception:
-            # 🔒 Never allow API to crash
+        except Exception as e:
+            print("❌ UpdateWhatsAppView error:", str(e))
             return Response(
                 {"error": "Failed to update WhatsApp settings"},
                 status=500,

@@ -13,7 +13,11 @@ from .views import (
     SendFileToWhatsAppView,
     whatsapp_incoming,
 )
-from .views import whatsapp_status_callback, whatsapp_status_webhook,
+from .views import (
+    whatsapp_status_callback,
+    whatsapp_status_webhook,
+)
+
 
 
 urlpatterns = [
