@@ -12,6 +12,8 @@ from django.http import HttpResponse
 from .models import UserProfile
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from files.whatsapp_utils import send_whatsapp_linking_instructions
+
 import requests
 import re
 

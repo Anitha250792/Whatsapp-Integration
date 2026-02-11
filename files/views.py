@@ -522,6 +522,3 @@ def whatsapp_status_webhook(request):
     print("📩 WhatsApp Status:", sid, status)
 
     return HttpResponse("OK")
-
-
-
