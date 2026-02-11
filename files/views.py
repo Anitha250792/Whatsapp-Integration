@@ -411,7 +411,9 @@ class SignPDFView(APIView):
         )
 
         # 3️⃣ Sign PDF
-        output_name = f"signed_{uuid.uuid4()}.pdf"
+        base_name = os.path.splitext(original_file.filename)[0]
+        output_name = f"{base_name}_signed.pdf"
+
         output_path = os.path.join(
             settings.MEDIA_ROOT, "uploads", output_name
         )
