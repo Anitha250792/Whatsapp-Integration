@@ -475,7 +475,11 @@ class PublicDownloadView(APIView):
         except ValueError:
             raise Http404("Invalid token")
 
-        obj = get_object_or_404(File, public_token=token)
+        try:
+            obj = File.objects.get(public_token=token)
+        except File.DoesNotExist:
+            raise Http404("File not found for this token")
+
 
         if not obj.file or not os.path.exists(obj.file.path):
             raise Http404("File not found")
