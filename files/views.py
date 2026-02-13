@@ -112,24 +112,6 @@ def mark_whatsapp_sent(profile):
     profile.save(update_fields=["daily_whatsapp_count"])
 
 
-class WhatsAppMixin:
-    def send_whatsapp(self, request, file_obj, title):
-        profile = getattr(request.user, "userprofile", None)
-        if not profile or not enforce_whatsapp_rules(request):
-            return
-
-        public_url = request.build_absolute_uri(
-            f"/files/public/{file_obj.public_token}/"
-        )
-
-        send_whatsapp_message(
-            profile.whatsapp_number,
-            title,
-            media_url=public_url
-        )
-
-
-        mark_whatsapp_sent(profile)
 
 
 # =====================================================
