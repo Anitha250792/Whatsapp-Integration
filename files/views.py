@@ -495,30 +495,28 @@ class PublicDownloadView(APIView):
 @csrf_exempt
 def whatsapp_status_callback(request):
     """
-    Webhook called by Twilio for delivery status updates
+    Twilio webhook for WhatsApp delivery status
     """
-    message_sid = request.POST.get("MessageSid")
-    message_status = request.POST.get("MessageStatus")
-    to_number = request.POST.get("To")
+    sid = request.POST.get("MessageSid")
+    status = request.POST.get("MessageStatus")
     error_code = request.POST.get("ErrorCode")
     error_message = request.POST.get("ErrorMessage")
 
-    print("📊 WhatsApp Delivery Update")
-    print("SID:", message_sid)
-    print("STATUS:", message_status)
-    print("TO:", to_number)
+    print("📊 WhatsApp Status Update")
+    print("SID:", sid)
+    print("STATUS:", status)
 
     if error_code:
         print("❌ Error Code:", error_code)
         print("❌ Error Message:", error_message)
 
-    return HttpResponse("OK")
-    
-@csrf_exempt
-def whatsapp_status_webhook(request):
-    sid = request.POST.get("MessageSid")
-    status = request.POST.get("MessageStatus")
+    try:
+        file = File.objects.filter().last()  # latest file (OK for now)
+        if file:
+            file.whatsapp_status = status
+            file.save(update_fields=["whatsapp_status"])
+    except Exception as e:
+        print("❌ Status update failed:", e)
 
-    print("📩 WhatsApp Status:", sid, status)
-
     return HttpResponse("OK")
+

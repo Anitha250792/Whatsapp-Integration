@@ -10,5 +10,11 @@ class File(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     public_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
+      # 🆕 WhatsApp delivery status
+    whatsapp_status = models.CharField(
+        max_length=20,
+        default="not_sent"
+    )
+
     def __str__(self):
         return self.filename

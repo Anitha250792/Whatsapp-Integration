@@ -11,6 +11,7 @@ class FileSerializer(serializers.ModelSerializer):
             "filename",
             "public_token",
             "public_url",
+            "whatsapp_status",
         ]
 
     def get_public_url(self, obj):
