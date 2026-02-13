@@ -20,7 +20,7 @@ from .models import File
 from .serializers import FileSerializer
 from .converters import merge_pdfs, split_pdf
 from .pdf_utils import sign_pdf
-from files.whatsapp import send_whatsapp_message
+
 from django.utils import timezone
 from uuid import UUID
 from files.whatsapp_utils import try_send_whatsapp
@@ -89,27 +89,6 @@ class SendFileToWhatsAppView(APIView):
              )
 
         return Response({"message": "WhatsApp attempted"}, status=200)
-
-# =====================================================
-# 🔔 WHATSAPP SAFETY (OPTIONAL – NEVER BLOCKS CORE)
-# =====================================================
-def enforce_whatsapp_rules(request):
-    profile = getattr(request.user, "userprofile", None)
-    if not profile or not profile.whatsapp_enabled or not profile.whatsapp_number:
-        return False
-
-    today = timezone.now().date()
-    if profile.last_whatsapp_date != today:
-        profile.daily_whatsapp_count = 0
-        profile.last_whatsapp_date = today
-        profile.save(update_fields=["daily_whatsapp_count", "last_whatsapp_date"])
-
-    return profile.daily_whatsapp_count < 5
-
-
-def mark_whatsapp_sent(profile):
-    profile.daily_whatsapp_count += 1
-    profile.save(update_fields=["daily_whatsapp_count"])
 
 
 
@@ -492,13 +471,19 @@ def whatsapp_status_callback(request):
         print("❌ Error Code:", error_code)
         print("❌ Error Message:", error_message)
 
+    if not sid:
+        return HttpResponse("No SID", status=400)
+
     try:
-        file = File.objects.filter().last()  # latest file (OK for now)
+        file = File.objects.filter(
+            whatsapp_message_sid=sid
+        ).first()
+
         if file:
             file.whatsapp_status = status
             file.save(update_fields=["whatsapp_status"])
+
     except Exception as e:
         print("❌ Status update failed:", e)
 
     return HttpResponse("OK")
-

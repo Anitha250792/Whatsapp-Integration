@@ -7,13 +7,10 @@ def try_send_whatsapp(user, request, file_obj, title):
 
     if not profile:
         return
-
     if not profile.whatsapp_enabled:
         return
-
     if not profile.whatsapp_number:
         return
-
     if not profile.can_send_whatsapp():
         return
 
@@ -21,37 +18,45 @@ def try_send_whatsapp(user, request, file_obj, title):
         f"/files/public/{file_obj.public_token}/"
     )
 
-    # 🔍 Detect ZIP file
     is_zip = file_obj.filename.lower().endswith(".zip")
 
+    # ✅ SEND MESSAGE
     if is_zip:
-        # 📦 ZIP → send only link
-        send_whatsapp_message(
+        sid = send_whatsapp_message(
             profile.whatsapp_number,
             f"{title}\n\n⬇️ Download ZIP here:\n{public_url}"
         )
     else:
-        # 📄 PDF → send as media
-        send_whatsapp_message(
+        sid = send_whatsapp_message(
             profile.whatsapp_number,
             title,
             media_url=public_url
         )
 
-    profile.increment_whatsapp()
+    # ✅ SAVE STATUS + SID
+    if sid:
+        file_obj.whatsapp_message_sid = sid
+        file_obj.whatsapp_status = "sent"
+        file_obj.save(update_fields=[
+            "whatsapp_message_sid",
+            "whatsapp_status"
+        ])
+
+        profile.increment_whatsapp()
+
 
 def send_whatsapp_linking_instructions(profile):
     message = (
         "🔗 *Link WhatsApp to File Converter*\n\n"
-        "To receive files on WhatsApp, please do this once:\n\n"
+        "To receive files automatically:\n\n"
         "1️⃣ Open WhatsApp\n"
         "2️⃣ Send this message:\n"
         "*join construction-cage*\n"
-        "3️⃣ Send it to this number:\n"
+        "3️⃣ Send it to:\n"
         "📞 +1 415 523 8886\n\n"
-        "Or click below:\n"
+        "Or tap:\n"
         "https://wa.me/14155238886?text=join%20construction-cage\n\n"
-        "✅ After this, files will be delivered automatically."
+        "✅ After linking, files will be delivered automatically."
     )
 
     send_whatsapp_message(profile.whatsapp_number, message)

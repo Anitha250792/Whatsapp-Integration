@@ -8,9 +8,19 @@ class File(models.Model):
     file = models.FileField(upload_to="uploads/")
     filename = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    public_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    public_token = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False
+    )
 
-      # 🆕 WhatsApp delivery status
+    # ✅ WhatsApp tracking
+    whatsapp_message_sid = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True
+    )
+
     whatsapp_status = models.CharField(
         max_length=20,
         default="not_sent"
