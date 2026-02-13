@@ -1,5 +1,4 @@
-
-from django.urls import path, include
+from django.urls import path
 from .views import (
     FileListView,
     UploadFileView,
@@ -13,21 +12,14 @@ from .views import (
     PublicDownloadView,
     SendFileToWhatsAppView,
     whatsapp_incoming,
-)
-from .views import (
     whatsapp_status_callback,
-    whatsapp_status_webhook,
 )
-
-
 
 urlpatterns = [
-    
     path("", FileListView.as_view()),
     path("upload/", UploadFileView.as_view()),
     path("download/<int:file_id>/", DownloadFileView.as_view(), name="file-download"),
     path("public/<str:token>/", PublicDownloadView.as_view(), name="file-public"),
-
 
     path("delete/<int:file_id>/", DeleteFileView.as_view()),
 
@@ -36,14 +28,10 @@ urlpatterns = [
     path("merge/", MergePDFView.as_view()),
     path("split/<int:file_id>/", SplitPDFView.as_view()),
     path("sign/<int:file_id>/", SignPDFView.as_view()),
+
     path("send-whatsapp/<int:file_id>/", SendFileToWhatsAppView.as_view()),
-    # files/urls.py
+
+    # ✅ Twilio webhooks
     path("webhooks/whatsapp/", whatsapp_incoming),
     path("webhooks/whatsapp-status/", whatsapp_status_callback),
-    path(
-    "webhooks/whatsapp-status/",
-    whatsapp_status_webhook,
-)
-
-    
 ]
