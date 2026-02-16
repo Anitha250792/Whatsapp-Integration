@@ -24,6 +24,8 @@ from .pdf_utils import sign_pdf
 from django.utils import timezone
 from uuid import UUID
 from files.whatsapp_utils import try_send_whatsapp
+from .utils.email_service import send_converted_file_email
+import threading
 
 
 
@@ -195,6 +197,17 @@ class WordToPDFView(APIView):
                 filename=output_name,
             )
 
+        user_email = request.user.email
+        converted_file_path = new_file.file.path
+
+        if request.user.email:
+           threading.Thread(
+               target=send_converted_file_email,
+               args=(request.user.email, new_file.file.path)
+           ).start()
+
+
+
         # 5️⃣ Build public URL (IMPORTANT for WhatsApp)
         public_url = request.build_absolute_uri(
             f"/files/public/{new_file.public_token}/"
@@ -232,6 +245,7 @@ class PDFToWordView(APIView):
             },
             status=501,
         )
+        
 
 # =====================================================
 # ➕ MERGE PDFs
@@ -259,6 +273,17 @@ class MergePDFView(APIView):
                 filename=filename,
             )
 
+        user_email = request.user.email
+        converted_file_path = new_file.file.path
+
+        if request.user.email:
+           threading.Thread(
+               target=send_converted_file_email,
+               args=(request.user.email, new_file.file.path)
+           ).start()
+
+
+
         public_url = request.build_absolute_uri(
             f"/files/public/{new_file.public_token}/"
         )
@@ -284,6 +309,7 @@ class SplitPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, file_id):
+
         # 1️⃣ Get original PDF
         original_file = get_object_or_404(
             File, id=file_id, user=request.user
@@ -317,12 +343,22 @@ class SplitPDFView(APIView):
                     filename=zip_name,
                 )
 
-            # 5️⃣ Public URL for WhatsApp
+            # 🔥 5️⃣ AUTO EMAIL SEND (CORRECT PLACE)
+            user_email = request.user.email
+            converted_file_path = zip_file.file.path
+
+            if user_email:
+                threading.Thread(
+                    target=send_converted_file_email,
+                    args=(user_email, converted_file_path)
+                ).start()
+
+            # 6️⃣ Public URL for WhatsApp
             public_url = request.build_absolute_uri(
                 f"/files/public/{zip_file.public_token}/"
             )
 
-            # 6️⃣ WhatsApp send (SAFE)
+            # 7️⃣ WhatsApp send (SAFE)
             profile = getattr(request.user, "userprofile", None)
 
             if (
@@ -334,11 +370,10 @@ class SplitPDFView(APIView):
                     request.user,
                     request,
                     zip_file,
-                     "📄 PDF split completed",
-)
+                    "📄 PDF split completed",
+                )
 
-
-            # 7️⃣ API response
+            # 8️⃣ API response
             return Response(
                 FileSerializer(
                     zip_file, context={"request": request}
@@ -347,7 +382,7 @@ class SplitPDFView(APIView):
             )
 
         finally:
-            # 8️⃣ Always clean temp files
+            # 9️⃣ Always clean temp files
             shutil.rmtree(tmpdir, ignore_errors=True)
 
 
@@ -392,6 +427,16 @@ class SignPDFView(APIView):
                 file=DjangoFile(f, name=output_name),
                 filename=output_name,
             )
+
+        user_email = request.user.email
+        converted_file_path = new_file.file.path
+
+        if user_email:
+           threading.Thread(
+               target=send_converted_file_email,
+               args=(user_email, converted_file_path)
+           ).start()
+
 
         # 5️⃣ Build public URL
         public_url = request.build_absolute_uri(
