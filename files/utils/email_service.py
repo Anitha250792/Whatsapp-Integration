@@ -16,7 +16,7 @@ def send_converted_file_email(user_email, file_path):
         message = Mail(
             from_email=settings.DEFAULT_FROM_EMAIL,
             to_emails=user_email,
-            subject="Your Converted File is Ready",
+            subject="ANI TEST 98765",
             plain_text_content="Hi,\n\nYour converted file is attached.\n\nThank you."
         )
 
