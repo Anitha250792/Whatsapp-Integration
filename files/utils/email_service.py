@@ -6,7 +6,8 @@ from django.conf import settings
 
 
 def send_converted_file_email(user_email, file_path):
-
+    print("🚀 EMAIL FUNCTION CALLED")
+    print("DEBUG API KEY:", settings.SENDGRID_API_KEY)
     try:
         message = Mail(
             from_email=settings.DEFAULT_FROM_EMAIL,
@@ -28,8 +29,6 @@ def send_converted_file_email(user_email, file_path):
         )
 
         message.attachment = attachment
-
-        print("DEBUG API KEY:", settings.SENDGRID_API_KEY)
 
         sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
         response = sg.send(message)
