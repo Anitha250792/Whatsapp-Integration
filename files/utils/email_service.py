@@ -29,9 +29,11 @@ def send_converted_file_email(user_email, file_path):
 
         message.attachment = attachment
 
+        print("DEBUG API KEY:", settings.SENDGRID_API_KEY)
+
         sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
         response = sg.send(message)
-
+        
         print("📧 Email sent successfully:", response.status_code)
 
     except Exception as e:
