@@ -314,3 +314,7 @@ EMAIL_HOST_USER = 'ntanithasaravanan@gmail.com'
 EMAIL_HOST_PASSWORD = 'telx fyzs wgze vrcw'
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+
+DEFAULT_FROM_EMAIL = "ntanithasaravanan@gmail.com"
